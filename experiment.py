@@ -1,5 +1,6 @@
 import keyboard
 import uuid
+import random
 from random import randrange
 import time
 import pygame
@@ -17,13 +18,14 @@ class Delegate(BeltControllerDelegate):
     pass
 
 pygame.init()
+random.seed()
 
 # Global variables
 participantID = 0
 belt_controller_delegate = Delegate()
 belt_controller = BeltController(belt_controller_delegate)
 obs_loacalization = list(([],[],[]))
-obs_grasping = [["time", "num_instructions", "condition"]]
+obs_grasping = [["time", "num_instructions", "condition", "success"]]
 #obs_graping_audio = list([])
 
 
@@ -58,7 +60,7 @@ def main():
         print("Generate new Participant ID? [y,n]")
         user_in = input()
 
-
+    print("Coinflip:" + str(random.sample([0,1], 1)))
     print("Press 1 to start the localization task. Press 2 to start the grasping task. Press 3 to start calibration.")
 
     #select localization or grasping task.
@@ -71,7 +73,7 @@ def main():
         if user_in == "1":
             localization_task()
             print(obs_loacalization)
-
+            calc_accuracy()
             write_to_csv(participantID, obs_loacalization, "localization")
 
             # Save observations to csv file.
@@ -219,6 +221,7 @@ def localization_task():
                     time.sleep(3)
                     break
                 elif action_int == 1:
+                    time.sleep(3)
                     #1. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -487,6 +490,7 @@ def localization_task():
                     break
 
                 elif action_int == 2:
+                    time.sleep(3)
                     # 1. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -745,6 +749,7 @@ def localization_task():
                     obs_loacalization[1].append(collect_response())
                     break
                 elif action_int == 3:
+                    time.sleep(3)
                     # 1. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -1019,11 +1024,13 @@ def grasping_task_tactile():
     curr = ""
     last = ""
     first = True
-
+    l = list(range(1,10))
+    random.shuffle(l)
+    print("Target order: " + str(l))
     user_in = input("Present example stimuli? [y,n]")
 
     if user_in == "y":
-         present_example_tactile()
+        present_example_tactile()
        
     while belt_controller.get_connection_state() == BeltConnectionState.CONNECTED:
 
@@ -1031,10 +1038,10 @@ def grasping_task_tactile():
 
         while True:
             try:
-                print(num_instructions)
+                #print(num_instructions)
                 # Check if its the first instruction and if it is log the start time.
-                if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial:
-                    begin = time.time()
+                if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial and not keyboard.is_pressed("s") and not keyboard.is_pressed("d"):
+                    begin = time.perf_counter()
                     print(begin)
                     #num_instructions += 1
                     new_trial = False
@@ -1047,55 +1054,69 @@ def grasping_task_tactile():
                 elif keyboard.is_pressed('s') and not new_trial:
                     belt_controller.stop_vibration()
                     print("stop")
-                    end = time.time()
+                    end = time.perf_counter()
                     elapsed = end - begin
                     elapsed = elapsed
                     new_trial = True
-                    print("Trial completed.")
+                    print("Trial completed and succeeded.")
                     print("Completion time is ", elapsed, "seconds")
-                    obs_grasping.append([elapsed, num_instructions, "tactile"])
+                    obs_grasping.append([elapsed, num_instructions, "tactile", "true"])
                     num_instructions = 0
                     #time.sleep(0.5)
                     break
-                elif keyboard.is_pressed('right'):
+                # Stop a failed trial and calc time
+                elif keyboard.is_pressed('d') and not new_trial:
+                    belt_controller.stop_vibration()
+                    print("stop")
+                    end = time.perf_counter()
+                    elapsed = end - begin
+                    elapsed = elapsed
+                    new_trial = True
+                    print("Trial completed and failed.")
+                    print("Completion time is ", elapsed, "seconds")
+                    obs_grasping.append([elapsed, num_instructions, "tactile", "false"])
+                    num_instructions = 0
+                    #time.sleep(0.5)
+                    break
+                elif keyboard.is_pressed('right') and not new_trial:
                     curr = "r"
-                    print("right")
+                    #print("right")
                     belt_controller.vibrate_at_angle(120, channel_index=0)
                     if curr != last:
                         last = curr
                         num_instructions += 1
                     #time.sleep(0.5)
                     break
-                elif keyboard.is_pressed('left'):
+                elif keyboard.is_pressed('left') and not new_trial:
                     curr = "l"
                     belt_controller.vibrate_at_angle(45, channel_index=0)
-                    print("left")
+                   # print("left")
                     if curr != last:
                         last = curr
                         num_instructions += 1
                     #time.sleep(0.5)
                     break
-                elif keyboard.is_pressed('down'):
+                elif keyboard.is_pressed('down') and not new_trial:
                     curr = "d"
                     if curr != last:
                         last = curr
                         num_instructions += 1
                     belt_controller.vibrate_at_angle(60, channel_index=0)
-                    print("down")
+                   # print("down")
 
                     #time.sleep(0.5)
                     break
-                elif keyboard.is_pressed('up'):
+                elif keyboard.is_pressed('up') and not new_trial:
                     curr = "u"
                     if curr != last:
                         last = curr
                         num_instructions += 1
                     belt_controller.vibrate_at_angle(90, channel_index=0)
-                    print("up")
+                   # print("up")
 
                     #time.sleep(0.5)
                     break
-                elif keyboard.is_pressed('f'):
+                elif keyboard.is_pressed('f') and not new_trial:
                     belt_controller.send_pulse_command(
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
@@ -1127,9 +1148,9 @@ def grasping_task_tactile():
     return 0
 
 def collect_response():
-    time_post_stim = time.time()
+    time_post_stim = time.perf_counter()
     response = ""
-    while time.time() - time_post_stim < 3:
+    while time.perf_counter() - time_post_stim < 3:
         if keyboard.is_pressed("left"):
             response = "left"
         if keyboard.is_pressed("right"):
@@ -1162,9 +1183,14 @@ def grasping_task_auditory():
         present_example_auditory()
         print("Starting trials...")
     
+    l = list(range(1,10))
+    random.shuffle(l)
+    print("Target order: " + str(l))
+
     while True:
-        if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial:
-            begin = time.time()
+        if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial and not keyboard.is_pressed("s") and not keyboard.is_pressed("d"):
+            begin = time.perf_counter()
+            last = ""
             new_trial = False
 
         if keyboard.is_pressed("q"):
@@ -1172,18 +1198,30 @@ def grasping_task_auditory():
             return
 
         if keyboard.is_pressed('s') and not new_trial:
-            end = time.time()
+            end = time.perf_counter()
             pygame.mixer.music.stop()
             print("stop")
             elapsed = end - begin
             new_trial = True
-            print("Trial completed.")
+            print("Trial completed and succeeded.")
             print("Completion time is ", elapsed, "seconds")
             print("Number of instructions is ", num_instructions)
-            obs_grasping.append([elapsed, num_instructions, "auditory"])
+            obs_grasping.append([elapsed, num_instructions, "auditory", "true"])
+            num_instructions = 0
+        # Failed trial
+        if keyboard.is_pressed('d') and not new_trial:
+            end = time.perf_counter()
+            pygame.mixer.music.stop()
+            print("stop")
+            elapsed = end - begin
+            new_trial = True
+            print("Trial completed and failed.")
+            print("Completion time is ", elapsed, "seconds")
+            print("Number of instructions is ", num_instructions)
+            obs_grasping.append([elapsed, num_instructions, "auditory", "false"])
             num_instructions = 0
 
-        elif keyboard.is_pressed('right'):
+        elif keyboard.is_pressed('right') and not new_trial:
             curr = "r"
             if curr != last:
                 pygame.mixer.music.load(audio_right)
@@ -1191,7 +1229,7 @@ def grasping_task_auditory():
                 num_instructions += 1
                 last = curr
 
-        elif keyboard.is_pressed('left'):
+        elif keyboard.is_pressed('left') and not new_trial:
             curr = "l"
             if curr != last:
                 pygame.mixer.music.load(audio_left)
@@ -1199,7 +1237,7 @@ def grasping_task_auditory():
                 num_instructions += 1
                 last = curr
 
-        elif keyboard.is_pressed('up'):
+        elif keyboard.is_pressed('up') and not new_trial:
             curr = "u"
             if curr != last:
                 pygame.mixer.music.load(audio_up)
@@ -1207,7 +1245,7 @@ def grasping_task_auditory():
                 num_instructions += 1
                 last = curr
 
-        elif keyboard.is_pressed('down'):
+        elif keyboard.is_pressed('down') and not new_trial:
             curr = "d"
             if curr != last:
                 pygame.mixer.music.load(audio_down)
@@ -1215,7 +1253,7 @@ def grasping_task_auditory():
                 num_instructions += 1
                 last = curr
 
-        elif keyboard.is_pressed('f'):
+        elif keyboard.is_pressed('f') and not new_trial:
             curr = "f"
             if curr != last:
                 pygame.mixer.music.load(audio_forward)
@@ -1326,5 +1364,43 @@ def generate_participantID():
     participantID = str(str(randrange(10)) + str(randrange(10)) + str(randrange(10)) + str(randrange(10)))
     return participantID
 
+def calc_accuracy():
+    correct = 0
+    num_blocks = 0
+    mean_correct = 0
+    block1 = list(["left", "up", "down", "right", "left", "down", "left", "right", "down", "up", "right", "up", "down", "left", "up", "right"])
+    block2 = list(["down", "up", "down", "right", "left", "right", "up", "left", "down", "right", "left", "up", "right", "down", "up", "left"])
+    block3 = list(["right", "up", "left", "right", "down", "up", "left", "right", "down", "up", "left", "down", "up", "right", "left", "down"])
+
+    print(obs_loacalization[0])
+    if len(obs_loacalization[0]) == 16:
+        try:
+            for i in range(16):
+                if obs_loacalization[0][i] == block1[i]:
+                    correct += 1
+            num_blocks += 1
+        except: print("ay")
+    if len(obs_loacalization[1]) == 16:
+        try:
+            for i in range(16):
+                if obs_loacalization[1][i] == block2[i]:
+                    correct += 1
+            num_blocks += 1
+        except: print("ay")
+    if len(obs_loacalization[2]) == 16:
+        try:
+            for i in range(16):
+                if obs_loacalization[2][i] == block3[i]:
+                    correct += 1
+            num_blocks += 1
+        except: print("ay")
+    
+    if num_blocks > 0:
+        mean_correct = correct / (num_blocks * 16)
+    
+
+
+    print(str(mean_correct) + "in " + str(num_blocks) + " blocks")
 if __name__ == "__main__":
     main()
+
