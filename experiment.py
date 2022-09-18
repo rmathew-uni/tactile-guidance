@@ -1023,6 +1023,8 @@ def grasping_task_tactile():
     num_instructions = 0
     curr = ""
     last = ""
+    time_limit = 10
+    begin = 0
     first = True
     l = list(range(1,10))
     random.shuffle(l)
@@ -1045,6 +1047,17 @@ def grasping_task_tactile():
                     print(begin)
                     #num_instructions += 1
                     new_trial = False
+                
+                # Check time limit.
+                elif(begin != 0):
+                    if(time.perf_counter() - begin > time_limit) and not new_trial:
+                        belt_controller.stop_vibration()
+                        print("stop")
+                        new_trial = True
+                        print("Time limit reached.")
+                        obs_grasping.append([time_limit, num_instructions, "tactile", "false"])
+                        num_instructions = 0
+                        #break
 
                 # Quit the task.
                 if keyboard.is_pressed("q"):
@@ -1175,7 +1188,8 @@ def grasping_task_auditory():
     last = ""
     new_trial = True
     num_instructions = 0
-
+    time_limit = 10
+    begin = 0
 
     user_in = input("Present example stimuli? [y,n]")
 
@@ -1192,6 +1206,16 @@ def grasping_task_auditory():
             begin = time.perf_counter()
             last = ""
             new_trial = False
+        
+        elif(begin != 0):
+            if(time.perf_counter() - begin > time_limit) and not new_trial:
+                        pygame.mixer.music.stop()
+                        print("stop")
+                        new_trial = True
+                        print("Time limit reached.")
+                        obs_grasping.append([time_limit, num_instructions, "auditory", "false"])
+                        num_instructions = 0
+                        
 
         if keyboard.is_pressed("q"):
             pygame.mixer.music.stop()
