@@ -1023,7 +1023,7 @@ def grasping_task_tactile():
     num_instructions = 0
     curr = ""
     last = ""
-    time_limit = 10
+    time_limit = 30
     begin = 0
     first = True
     l = list(range(1,10))
@@ -1188,7 +1188,7 @@ def grasping_task_auditory():
     last = ""
     new_trial = True
     num_instructions = 0
-    time_limit = 10
+    time_limit = 30
     begin = 0
 
     user_in = input("Present example stimuli? [y,n]")
@@ -1308,12 +1308,12 @@ def present_example_tactile():
                 pulse_period=500,
                 pulse_iterations=9,
                 series_period=5000,
-                series_iterations=1,
+                series_iterations=3,
                 timer_option=BeltVibrationTimerOption.RESET_TIMER,
                 exclusive_channel=False,
                 clear_other_channels=False
                 )
-        if keyboard.is_pressed("k"):
+        if keyboard.is_pressed("q"):
             belt_controller.stop_vibration()
             break
             
@@ -1326,28 +1326,46 @@ def present_example_auditory():
     audio_down = Path().cwd() / "instruction_down.wav"
     audio_forward = Path().cwd() / "instruction_forward.wav"
 
+    curr = ""
+    last = ""
+
     while True:
 
-        if keyboard.is_pressed("k"):
+        if keyboard.is_pressed("q"):
             pygame.mixer.music.stop()
             return
         if keyboard.is_pressed('s'):
             pygame.mixer.music.stop()
         elif keyboard.is_pressed('right'):
-            pygame.mixer.music.load(audio_right)
-            pygame.mixer.music.play(-1)
+            curr = "r"
+            if curr != last:
+                pygame.mixer.music.load(audio_right)
+                pygame.mixer.music.play(-1)
+                last = curr
         elif keyboard.is_pressed('left'):
-            pygame.mixer.music.load(audio_left)
-            pygame.mixer.music.play(-1)
+            curr = "l"
+            if curr != last:
+                pygame.mixer.music.load(audio_left)
+                pygame.mixer.music.play(-1)
+                last = curr
         elif keyboard.is_pressed('up'):
-            pygame.mixer.music.load(audio_up)
-            pygame.mixer.music.play(-1)
+            curr = "u"
+            if curr != last:
+                pygame.mixer.music.load(audio_up)
+                pygame.mixer.music.play(-1)
+                last = curr
         elif keyboard.is_pressed('down'):
-            pygame.mixer.music.load(audio_down)
-            pygame.mixer.music.play(-1)
+            curr = "d"
+            if curr != last:
+                pygame.mixer.music.load(audio_down)
+                pygame.mixer.music.play(-1)
+                last = curr
         elif keyboard.is_pressed('f'):
-            pygame.mixer.music.load(audio_forward)
-            pygame.mixer.music.play(-1)
+            curr = "f"
+            if curr != last:
+                pygame.mixer.music.load(audio_forward)
+                pygame.mixer.music.play(-1)
+                last = curr
 
 def calibrate_motors():
     angle = 0
