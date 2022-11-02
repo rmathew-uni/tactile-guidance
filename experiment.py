@@ -1,3 +1,5 @@
+from operator import le
+from sre_constants import SUCCESS
 import keyboard
 import uuid
 import random
@@ -24,8 +26,9 @@ random.seed()
 participantID = 0
 belt_controller_delegate = Delegate()
 belt_controller = BeltController(belt_controller_delegate)
-obs_loacalization = list(([],[],[]))
-obs_grasping = [["time", "num_instructions", "condition", "success"]]
+obs_loacalization = list(([],[],[],[],[],[],[],[],[]))
+obs_grasping = [["time", "num_instructions", "condition", "block", "success"]]
+block_grasping = 1
 #obs_graping_audio = list([])
 
 
@@ -147,6 +150,7 @@ def localization_task():
         print("3. Trials block 3")
         print("9. Example stimuli")
         action = input()
+        index = 0 #index for block repetition
         while True:
             try:
                 action_int = int(action)
@@ -221,6 +225,11 @@ def localization_task():
                     time.sleep(3)
                     break
                 elif action_int == 1:
+                    index = 0
+                    if len(obs_loacalization[0]) == 16:
+                        index = 3
+                        if len(obs_loacalization[3]) == 16:
+                            index = 6
                     time.sleep(3)
                     #1. Left
                     belt_controller.send_pulse_command(
@@ -239,7 +248,7 @@ def localization_task():
                     )
 
                     #time bounded inupt
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
 
 
                     #wait for input
@@ -259,7 +268,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     #time.sleep(3)
                     #3. Down
                     belt_controller.send_pulse_command(
@@ -276,7 +285,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     print(obs_loacalization)
                     #time.sleep(3)
                     #4. Right
@@ -294,7 +303,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 5. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -310,7 +319,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 6. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -326,7 +335,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 7. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -342,7 +351,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 8. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -358,7 +367,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 9. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -374,7 +383,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 10. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -390,7 +399,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 11. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -406,7 +415,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 12. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -422,7 +431,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 13. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -438,7 +447,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 14. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -454,7 +463,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 15. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -470,7 +479,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 16. RIght
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -486,10 +495,15 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[0].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     break
 
                 elif action_int == 2:
+                    index = 1
+                    if len(obs_loacalization[1]) == 16:
+                        index = 4
+                        if len(obs_loacalization[4]) == 16:
+                            index = 7
                     time.sleep(3)
                     # 1. Down
                     belt_controller.send_pulse_command(
@@ -506,7 +520,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 2. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -522,7 +536,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 3. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -538,7 +552,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 4. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -554,7 +568,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 4. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -570,7 +584,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 6. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -586,7 +600,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 7. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -602,7 +616,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 8. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -618,7 +632,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 9. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -634,7 +648,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 10. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -650,7 +664,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 11. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -666,7 +680,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 12. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -682,7 +696,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 13. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -698,7 +712,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 14. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -714,7 +728,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 15. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -730,7 +744,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 16. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -746,9 +760,14 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[1].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     break
                 elif action_int == 3:
+                    index = 2
+                    if len(obs_loacalization[2]) == 16:
+                        index = 5
+                        if len(obs_loacalization[5]) == 16:
+                            index = 8
                     time.sleep(3)
                     # 1. Right
                     belt_controller.send_pulse_command(
@@ -765,7 +784,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 2. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -781,7 +800,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 3. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -797,7 +816,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 4. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -813,7 +832,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 5. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -829,7 +848,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 6. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -845,7 +864,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 7. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -861,7 +880,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 8. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -877,7 +896,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 9. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -893,7 +912,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 10. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -909,7 +928,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 11. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -925,7 +944,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 12. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -941,7 +960,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 13. Up
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -957,7 +976,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 14. Right
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -973,7 +992,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 15. Left
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -989,7 +1008,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     # 16. Down
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -1005,7 +1024,7 @@ def localization_task():
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-                    obs_loacalization[2].append(collect_response())
+                    obs_loacalization[index].append(collect_response())
                     break
                 else:
                     print("Unrecognized input.")
@@ -1026,13 +1045,22 @@ def grasping_task_tactile():
     time_limit = 30
     begin = 0
     first = True
+    target_idx = 0
+    rep_idx = 0
     l = list(range(1,10))
     random.shuffle(l)
-    print("Target order: " + str(l))
+    rep_list = list() # List to store targets that must be repeated
+    
+
+    
     user_in = input("Present example stimuli? [y,n]")
 
     if user_in == "y":
         present_example_tactile()
+
+    block_grasping = input("Enter block number")
+    print("Target order: " + str(l))
+    print("Target: " + str(l[target_idx]))
        
     while belt_controller.get_connection_state() == BeltConnectionState.CONNECTED:
 
@@ -1042,6 +1070,9 @@ def grasping_task_tactile():
             try:
                 #print(num_instructions)
                 # Check if its the first instruction and if it is log the start time.
+                
+               
+                
                 if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial and not keyboard.is_pressed("s") and not keyboard.is_pressed("d"):
                     begin = time.perf_counter()
                     print(begin)
@@ -1055,7 +1086,7 @@ def grasping_task_tactile():
                         print("stop")
                         new_trial = True
                         print("Time limit reached.")
-                        obs_grasping.append([time_limit, num_instructions, "tactile", "false"])
+                        obs_grasping.append([time_limit, num_instructions, target_idx, "tactile", "false"])
                         num_instructions = 0
                         #break
 
@@ -1071,14 +1102,43 @@ def grasping_task_tactile():
                     elapsed = end - begin
                     elapsed = elapsed
                     new_trial = True
-                    print("Trial completed and succeeded.")
+                    print("Trial completed.")
                     print("Completion time is ", elapsed, "seconds")
-                    obs_grasping.append([elapsed, num_instructions, "tactile", "true"])
+                    result = ""
+                    while result not in ["s","d","f"]:
+                        result = input("Press s for success, d for fail or f for experimenter fail.")
+                    if result == "s": result = "success"
+                    elif result == "d": result = "fail"
+                    else: 
+                        result = "exFail"
+                        if target_idx < 8:
+                            rep_list.append(l[target_idx]) # Append target where experimenter failed to repetition list
+                        else: 
+                            try:
+                                rep_list.append(rep_list[rep_idx-1])
+                            except: print("out of index")
+                    if target_idx < 9: 
+                        obs_grasping.append([elapsed, num_instructions, l[target_idx], block_grasping, "tactile", result])
+                    elif len(rep_list) > rep_idx-1:
+                        obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx-1]), block_grasping, "tactile", result])
                     num_instructions = 0
+                    last = ""
+                    
+                    target_idx += 1
+                    if target_idx > 8: # Check if all targets have been recorded.
+                        if len(rep_list) != 0: # Check if targets must be repeated.
+                            if len(rep_list) > rep_idx:
+                                print("Repetition target:" + str(rep_list[rep_idx])) 
+                                rep_idx += 1
+                                
+                            else: print("Block finished!")
+                        else: print("Block finished!")
+                    else: print(l[target_idx]) # Print target.                    
+                
                     #time.sleep(0.5)
                     break
                 # Stop a failed trial and calc time
-                elif keyboard.is_pressed('d') and not new_trial:
+                """  elif keyboard.is_pressed('d') and not new_trial:
                     belt_controller.stop_vibration()
                     print("stop")
                     end = time.perf_counter()
@@ -1090,8 +1150,8 @@ def grasping_task_tactile():
                     obs_grasping.append([elapsed, num_instructions, "tactile", "false"])
                     num_instructions = 0
                     #time.sleep(0.5)
-                    break
-                elif keyboard.is_pressed('right') and not new_trial:
+                    break """
+                if keyboard.is_pressed('right') and not new_trial:
                     curr = "r"
                     #print("right")
                     belt_controller.vibrate_at_angle(120, channel_index=0)
@@ -1191,15 +1251,21 @@ def grasping_task_auditory():
     time_limit = 30
     begin = 0
 
+    target_idx = 0
+    rep_idx = 0
+    target_list = list(range(1,10))
+    random.shuffle(target_list)
+    rep_list = list() # Store targets that must be repeated.
+
     user_in = input("Present example stimuli? [y,n]")
 
     if user_in == "y":
         present_example_auditory()
         print("Starting trials...")
     
-    l = list(range(1,10))
-    random.shuffle(l)
-    print("Target order: " + str(l))
+    block_auditory = input("Enter Block number: ")
+    print("Target order: " + str(target_list)) # Print target order.
+    print("Target: " +  str(target_list[target_idx])) # Print first target.
 
     while True:
         if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial and not keyboard.is_pressed("s") and not keyboard.is_pressed("d"):
@@ -1227,13 +1293,44 @@ def grasping_task_auditory():
             print("stop")
             elapsed = end - begin
             new_trial = True
-            print("Trial completed and succeeded.")
+            print("Trial completed.")
             print("Completion time is ", elapsed, "seconds")
             print("Number of instructions is ", num_instructions)
-            obs_grasping.append([elapsed, num_instructions, "auditory", "true"])
+            result = ""
+            while result not in ["s","d","f"]:
+                result = input("Press s for success, d for fail or f for experimenter fail.")
+            if result == "s": result = "success"
+            elif result == "d": result = "fail"
+            else: 
+                result = "exFail"
+                if target_idx < 8:
+                    rep_list.append(target_list[target_idx]) # Append target where experimenter failed to repetition list
+                else:
+                    try:
+                        rep_list.append(rep_list[rep_idx-1])
+                    except: print("Out of Index")
+            if target_idx < 9:
+                obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_auditory, "auditory", result])
+            elif len(rep_list) > rep_idx-1:
+                obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx-1]), block_grasping, "tactile", result])
             num_instructions = 0
+            last = ""
+
+            target_idx += 1
+            if target_idx > 8: # Check if all targets have been recorded.
+                if len(rep_list) != 0: # Check if targets must be repeated.
+                    if len(rep_list) > rep_idx:
+                        print("Repetition target:" + str(rep_list[rep_idx])) 
+                        rep_idx += 1
+
+                    else: print("Block finished!")
+                else: print("Block finished!")
+            else: print(target_list[target_idx]) # Print target.
+            
+            #obs_grasping.append([elapsed, num_instructions, "auditory", result])
+            #num_instructions = 0
         # Failed trial
-        if keyboard.is_pressed('d') and not new_trial:
+        """ if keyboard.is_pressed('d') and not new_trial:
             end = time.perf_counter()
             pygame.mixer.music.stop()
             print("stop")
@@ -1243,9 +1340,9 @@ def grasping_task_auditory():
             print("Completion time is ", elapsed, "seconds")
             print("Number of instructions is ", num_instructions)
             obs_grasping.append([elapsed, num_instructions, "auditory", "false"])
-            num_instructions = 0
+            num_instructions = 0 """
 
-        elif keyboard.is_pressed('right') and not new_trial:
+        if keyboard.is_pressed('right') and not new_trial:
             curr = "r"
             if curr != last:
                 pygame.mixer.music.load(audio_right)
@@ -1414,7 +1511,20 @@ def calc_accuracy():
     block2 = list(["down", "up", "down", "right", "left", "right", "up", "left", "down", "right", "left", "up", "right", "down", "up", "left"])
     block3 = list(["right", "up", "left", "right", "down", "up", "left", "right", "down", "up", "left", "down", "up", "right", "left", "down"])
 
-    print(obs_loacalization[0])
+
+
+    for x in range(9):
+        if len(obs_loacalization[x]) == 16:
+            if x == 0 or x == 3 or x == 6: block = block1
+            elif x == 1 or x == 4 or x == 7: block = block2
+            else: block = block3
+            for i in range(16):
+                if obs_loacalization[x][i] == block[i]:
+                    correct += 1
+            num_blocks += 1
+    
+    
+    """ print(obs_loacalization[0])
     if len(obs_loacalization[0]) == 16:
         try:
             for i in range(16):
@@ -1436,7 +1546,8 @@ def calc_accuracy():
                     correct += 1
             num_blocks += 1
         except: print("ay")
-    
+     """
+    print(correct)
     if num_blocks > 0:
         mean_correct = correct / (num_blocks * 16)
     
