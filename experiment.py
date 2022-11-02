@@ -26,14 +26,16 @@ random.seed()
 participantID = 0
 belt_controller_delegate = Delegate()
 belt_controller = BeltController(belt_controller_delegate)
-obs_loacalization = list(([],[],[],[],[],[],[],[],[]))
+obs_localization = []
+#obs_localization = list(([],[],[],[],[],[],[],[],[]))
+block_localization = 1
+presented_stimuli_localization = []
 obs_grasping = [["time", "num_instructions", "condition", "block", "success"]]
 block_grasping = 1
 #obs_graping_audio = list([])
 
 
 def main():
-
     print("Welcome to the \"Guiding grasping motions of blindfolded subjects using localized tactile stimulation\" experiment!")
     print("Please connect the tactile bracelet and press Enter to continue.")
 
@@ -75,10 +77,10 @@ def main():
         # Start localization task
         if user_in == "1":
             localization_task()
-            print(obs_loacalization)
+            print(obs_localization)
             calc_accuracy()
-            write_to_csv(participantID, obs_loacalization, "localization")
-
+            write_to_csv(participantID, obs_localization, "localization")
+            write_to_csv(participantID, presented_stimuli_localization, "stimuli")
             # Save observations to csv file.
 
             #if file exists read rows into list so that new obs can be added to old
@@ -86,7 +88,7 @@ def main():
             #with open(filepath, 'w') as file:
                 #writer = csv.writer(file)
 
-                #for list in obs_loacalization:
+                #for list in obs_localization:
                     #writer.writerow(list)
 
 
@@ -119,6 +121,9 @@ def write_to_csv(id, observations, task):
 
     elif task == "grasping":
         filepath = str(id + "_grasping" + ".csv")
+    
+    elif task == "stimuli":
+        filepath = str(id + "_stimuli" + ".csv")
 
     with open(filepath, 'w') as file:
         writer = csv.writer(file)
@@ -149,8 +154,12 @@ def localization_task():
         print("2. Trials block 2")
         print("3. Trials block 3")
         print("9. Example stimuli")
+        print("8. Super secret dev mode")
         action = input()
         index = 0 #index for block repetition
+        global block_localization
+       
+        
         while True:
             try:
                 action_int = int(action)
@@ -158,6 +167,60 @@ def localization_task():
                     belt_controller.stop_vibration()
                     print("stop")
                     break
+                
+
+                elif action_int == 8:
+                    stop = False
+                    while not stop:
+
+                        print("Current block is number " + str(block_localization))
+                        stimuli = [45,60,90,120] # list of orientations
+
+                        random.shuffle(stimuli) # shuffle orientations
+                        obs_localization.append([])
+                        trans_stimuli = [] # List with stimuli translated from orientation to direction.
+                        # Translate stimuli from orientation to direction.
+                        for stimulus in stimuli:
+                            if stimulus == 45: trans_stimuli.append("left")
+                            elif stimulus == 60: trans_stimuli.append("down")
+                            elif stimulus ==  90: trans_stimuli.append("up")
+                            elif stimulus == 120: trans_stimuli.append("right")
+                        presented_stimuli_localization.append(trans_stimuli)
+                    
+                        print(stimuli)
+                        time.sleep(3)
+                        for stimulus in stimuli:
+                            print(stimulus)
+                            belt_controller.send_pulse_command(
+                            channel_index=0,
+                            orientation_type=BeltOrientationType.ANGLE,
+                            orientation=stimulus,
+                            intensity=None,
+                            on_duration_ms=500,
+                            pulse_period=2000,
+                            pulse_iterations=1,
+                            series_period=1500,
+                            series_iterations=1,
+                            timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                            exclusive_channel=False,
+                            clear_other_channels=False
+                            )
+                            obs_localization[block_localization-1].append(collect_response())
+                            #time.sleep(3)
+                        
+
+                        user_in = input("Block " + str(block_localization) + " completed. Continue?[y,n]")
+                        block_localization += 1
+                        if user_in == "n": stop = True 
+                    print(presented_stimuli_localization)
+                    break
+                    
+                        
+
+                
+                
+                
+                
                 elif action_int == 9:
                     #Up
                     belt_controller.send_pulse_command(
@@ -224,808 +287,7 @@ def localization_task():
                     )
                     time.sleep(3)
                     break
-                elif action_int == 1:
-                    index = 0
-                    if len(obs_loacalization[0]) == 16:
-                        index = 3
-                        if len(obs_loacalization[3]) == 16:
-                            index = 6
-                    time.sleep(3)
-                    #1. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
 
-                    #time bounded inupt
-                    obs_loacalization[index].append(collect_response())
-
-
-                    #wait for input
-                    #time.sleep(3)
-                    #2. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=2000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    #time.sleep(3)
-                    #3. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    print(obs_loacalization)
-                    #time.sleep(3)
-                    #4. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 5. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 6. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 7. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 8. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 9. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 10. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 11. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 12. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 13. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 14. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 15. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 16. RIght
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    break
-
-                elif action_int == 2:
-                    index = 1
-                    if len(obs_loacalization[1]) == 16:
-                        index = 4
-                        if len(obs_loacalization[4]) == 16:
-                            index = 7
-                    time.sleep(3)
-                    # 1. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 2. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 3. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 4. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 4. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 6. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 7. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 8. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 9. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 10. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 11. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 12. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 13. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 14. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 15. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 16. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    break
-                elif action_int == 3:
-                    index = 2
-                    if len(obs_loacalization[2]) == 16:
-                        index = 5
-                        if len(obs_loacalization[5]) == 16:
-                            index = 8
-                    time.sleep(3)
-                    # 1. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 2. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=2000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 3. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 4. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 5. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 6. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 7. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 8. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 9. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 10. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 11. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 12. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 13. Up
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=90,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 14. Right
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 15. Left
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=45,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    # 16. Down
-                    belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=None,
-                        on_duration_ms=500,
-                        pulse_period=1000,
-                        pulse_iterations=1,
-                        series_period=1500,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-                    obs_loacalization[index].append(collect_response())
-                    break
                 else:
                     print("Unrecognized input.")
                     break
@@ -1507,49 +769,57 @@ def calc_accuracy():
     correct = 0
     num_blocks = 0
     mean_correct = 0
+    
     block1 = list(["left", "up", "down", "right", "left", "down", "left", "right", "down", "up", "right", "up", "down", "left", "up", "right"])
     block2 = list(["down", "up", "down", "right", "left", "right", "up", "left", "down", "right", "left", "up", "right", "down", "up", "left"])
     block3 = list(["right", "up", "left", "right", "down", "up", "left", "right", "down", "up", "left", "down", "up", "right", "left", "down"])
-
-
-
-    for x in range(9):
-        if len(obs_loacalization[x]) == 16:
+    print("0")
+    print(obs_localization)
+    print("1")
+    print(presented_stimuli_localization)
+    print("2")
+    for x in range(len(obs_localization)):
+        for i in range(len(obs_localization[x])):
+            if obs_localization[x][i] == presented_stimuli_localization[x][i]:
+                correct += 1
+        num_blocks += 1
+    """ for x in range(9):
+        if len(obs_localization[x]) == 16:
             if x == 0 or x == 3 or x == 6: block = block1
             elif x == 1 or x == 4 or x == 7: block = block2
             else: block = block3
             for i in range(16):
-                if obs_loacalization[x][i] == block[i]:
+                if obs_localization[x][i] == block[i]:
                     correct += 1
-            num_blocks += 1
+            num_blocks += 1 """
     
     
-    """ print(obs_loacalization[0])
-    if len(obs_loacalization[0]) == 16:
+    """ print(obs_localization[0])
+    if len(obs_localization[0]) == 16:
         try:
             for i in range(16):
-                if obs_loacalization[0][i] == block1[i]:
+                if obs_localization[0][i] == block1[i]:
                     correct += 1
             num_blocks += 1
         except: print("ay")
-    if len(obs_loacalization[1]) == 16:
+    if len(obs_localization[1]) == 16:
         try:
             for i in range(16):
-                if obs_loacalization[1][i] == block2[i]:
+                if obs_localization[1][i] == block2[i]:
                     correct += 1
             num_blocks += 1
         except: print("ay")
-    if len(obs_loacalization[2]) == 16:
+    if len(obs_localization[2]) == 16:
         try:
             for i in range(16):
-                if obs_loacalization[2][i] == block3[i]:
+                if obs_localization[2][i] == block3[i]:
                     correct += 1
             num_blocks += 1
         except: print("ay")
      """
     print(correct)
     if num_blocks > 0:
-        mean_correct = correct / (num_blocks * 16)
+        mean_correct = correct / (num_blocks * len(obs_localization[0]))
     
 
 
