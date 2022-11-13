@@ -70,7 +70,7 @@ def main():
 
         # Start grasping task
         if user_in == 2:
-            user_in = get_input("Tactile or auditory condition? [1,2]", type_=int, min_=1, max_=2)
+            user_in = get_input("Tactile or auditory condition?. Press 0 to return. [1,2,0]", type_=int, min_=0, max_=2)
             if user_in == 1:
                 grasping_task("tactile")
                 print(obs_grasping)
@@ -79,7 +79,8 @@ def main():
                     grasping_task("auditory")
                     print(obs_grasping)
                     write_to_csv(participantID, obs_grasping, "grasping")
-
+            elif user_in == 0:
+                continue
         if user_in == 3:
             calibrate_motors()
 
@@ -333,8 +334,12 @@ def grasping_task(condition):
                         print("Repetition target:" + str(rep_list[rep_idx])) 
                         rep_idx += 1
                         
-                    else: print("Block finished!")
-                else: print("Block finished!")
+                    else: 
+                        print("Block finished!")
+                        return
+                else: 
+                    print("Block finished!")
+                    return
             else: print(target_list[target_idx]) # Print target.                    
         
             #time.sleep(0.5)
