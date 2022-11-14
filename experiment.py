@@ -313,20 +313,20 @@ def grasping_task(condition):
                 if target_idx < 9: # Check if all targets have been recorded before.
                     rep_list.append(target_list[target_idx]) # Append target where experimenter failed to repetition list.
                 else: # If all targets have been recorded.
-                    try:
-                        rep_list.append(rep_list[rep_idx-1]) 
-                    except: print("out of index")
+                    rep_list.append(rep_list[rep_idx]) 
             # No experimenter fail.
             if target_idx < 9: 
                 if condition == "tactile": 
                     obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_tactile, "tactile", result])
                 elif condition == "auditory":
                     obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_auditory, "auditory", result])
-            elif len(rep_list) > rep_idx-1:
+            elif len(rep_list) > rep_idx:
                 if condition == "tactile":
-                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx-1]), block_grasping, "tactile", result])
+                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_grasping, "tactile", result])
+                    rep_idx += 1
                 elif condition == "auditory":
-                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx-1]), block_auditory, "auditory", result])
+                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_auditory, "auditory", result])
+                    rep_idx += 1
             num_instructions = 0
             last = ""
             target_idx += 1
@@ -334,7 +334,8 @@ def grasping_task(condition):
                 if len(rep_list) != 0: # Check if targets must be repeated.
                     if len(rep_list) > rep_idx:
                         print("Repetition target:" + str(rep_list[rep_idx])) 
-                        rep_idx += 1
+                        print(rep_list)
+                        #rep_idx += 1
                         
                     else: 
                         print("Block finished!")
@@ -354,6 +355,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_right)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
+                print("Instruction+")
                 last = "r"
 
         elif keyboard.is_pressed('left') and not new_trial and last != "l":
@@ -363,6 +365,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_left)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
+                print("Instruction+")
                 last = "l"
 
         elif keyboard.is_pressed('down') and not new_trial and last != "d":
@@ -372,6 +375,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_down)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
+                print("Instruction+")
                 last = "d"
 
         elif keyboard.is_pressed('up') and not new_trial and last != "u":
@@ -381,6 +385,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_up)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
+                print("Instruction+")
                 last = "u"
 
         elif keyboard.is_pressed('f') and not new_trial and last != "f":
@@ -403,6 +408,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_forward)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
+                print("Instruction+")
                 last = "f"
 
 def present_example_stimuli(condition):
@@ -518,7 +524,7 @@ def connect_belt():
 def collect_response():
     time_post_stim = time.perf_counter()
     response = ""
-    while time.perf_counter() - time_post_stim < 3:
+    while time.perf_counter() - time_post_stim < 3: # Listen to keyboard input for 3 seconds.
         if keyboard.is_pressed("left"):
             response = "left"
         if keyboard.is_pressed("right"):
