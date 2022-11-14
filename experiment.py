@@ -228,6 +228,7 @@ def grasping_task(condition):
     new_trial = True
     num_instructions = 0
     time_limit = 30
+    curr = ""
     last = ""
     time_limit = 30
     begin = 0
@@ -236,7 +237,6 @@ def grasping_task(condition):
     target_list = list(range(1,10))
     random.shuffle(target_list)
     rep_list = []
-
     # Present example stimuli.
     user_in = get_input("Present example stimuli? [y,n]", range_=("y","n"))
     if user_in == "y":
@@ -245,8 +245,7 @@ def grasping_task(condition):
             present_example_stimuli("tactile")
         elif condition == "auditory":
             present_example_stimuli("auditory")
-            #present_example_auditory()
-    
+            #present_example_auditory() 
     # Get block number or quit.
     if condition == "tactile":
         block_tactile = get_input("Enter a block number or press 0 to quit the task.", type_=int, min_=0)
@@ -292,7 +291,7 @@ def grasping_task(condition):
                 pygame.mixer.music.stop()
             return
         
-        # Stop the trial and calculate the time.
+        # Stop the trial, calculate the time and append the observations.
         elif keyboard.is_pressed('s') and not new_trial:
             end = time.perf_counter()
             elapsed = end - begin # Calculate trial time.
@@ -348,7 +347,9 @@ def grasping_task(condition):
             #time.sleep(0.5)
             #break
 
-        elif keyboard.is_pressed('right') and not new_trial and last != "r":
+        if keyboard.is_pressed('right') and not new_trial:
+            curr = "r"
+            if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(120, channel_index=0)
                 elif condition == "auditory":
@@ -356,9 +357,12 @@ def grasping_task(condition):
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
                 print("Instruction+")
-                last = "r"
+                last = curr
+      
 
-        elif keyboard.is_pressed('left') and not new_trial and last != "l":
+        elif keyboard.is_pressed('left') and not new_trial:
+            curr = "l"
+            if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(45, channel_index=0)
                 elif condition == "auditory":
@@ -366,9 +370,12 @@ def grasping_task(condition):
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
                 print("Instruction+")
-                last = "l"
+                last = curr
+            
 
-        elif keyboard.is_pressed('down') and not new_trial and last != "d":
+        elif keyboard.is_pressed('down') and not new_trial:
+            curr = "d"
+            if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(60, channel_index=0)
                 elif condition == "auditory":
@@ -376,9 +383,12 @@ def grasping_task(condition):
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
                 print("Instruction+")
-                last = "d"
+                last = curr
+                
 
-        elif keyboard.is_pressed('up') and not new_trial and last != "u":
+        elif keyboard.is_pressed('up') and not new_trial:
+            curr = "u"
+            if last != curr:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(90, channel_index=0)
                 elif condition == "auditory":
@@ -386,9 +396,12 @@ def grasping_task(condition):
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
                 print("Instruction+")
-                last = "u"
+                last = curr
 
-        elif keyboard.is_pressed('f') and not new_trial and last != "f":
+
+        elif keyboard.is_pressed('f') and not new_trial:
+            curr = "f"
+            if last != curr:
                 if condition == "tactile":
                     belt_controller.send_pulse_command(
                         channel_index=0,
@@ -409,7 +422,8 @@ def grasping_task(condition):
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
                 print("Instruction+")
-                last = "f"
+                last = curr
+
 
 def present_example_stimuli(condition):
     if condition == "auditory":
@@ -420,7 +434,12 @@ def present_example_stimuli(condition):
         audio_down = Path().cwd() / "instruction_down.wav"
         audio_forward = Path().cwd() / "instruction_forward.wav"
     
+    curr = ""
     last = ""
+
+    targets = random.sample(list(range(1,10)), 3) # Draw 3 random targets
+    print("Example targets: " + str(targets))
+
 
     while True:
         # Stop the stimulus.
@@ -429,59 +448,70 @@ def present_example_stimuli(condition):
                 belt_controller.stop_vibration()
             elif condition == "auditory":
                 pygame.mixer.music.stop()
+            last = ""
         # Present right stimulus.
-        if keyboard.is_pressed('right') and last != "r":
-            if condition == "tactile":
-                belt_controller.vibrate_at_angle(120, channel_index=0)
-            elif condition == "auditory":
-                pygame.mixer.music.load(audio_right)
-                pygame.mixer.music.play(-1)
-            last = "r"
+        elif keyboard.is_pressed('right'):
+            curr = "r"
+            if curr != last:
+                if condition == "tactile":
+                    belt_controller.vibrate_at_angle(120, channel_index=0)
+                elif condition == "auditory":
+                    pygame.mixer.music.load(audio_right)
+                    pygame.mixer.music.play(-1)
+                last = curr
         # Present up stimulus.
-        if keyboard.is_pressed('up') and last != "u":
-            if condition == "tactile":
-                belt_controller.vibrate_at_angle(90, channel_index=0)
-            elif condition == "auditory":
-                pygame.mixer.music.load(audio_up)
-                pygame.mixer.music.play(-1)
-            last = "u"
+        elif keyboard.is_pressed('up'):
+            curr = "u"
+            if curr != last:
+                if condition == "tactile":
+                    belt_controller.vibrate_at_angle(90, channel_index=0)
+                elif condition == "auditory":
+                    pygame.mixer.music.load(audio_up)
+                    pygame.mixer.music.play(-1)
+                last = curr
         #Present down stimulus.
-        if keyboard.is_pressed('down') and last != "d":
-            if condition == "tactile":
-                belt_controller.vibrate_at_angle(60, channel_index=0)
-            elif condition == "auditory":
-                pygame.mixer.music.load(audio_down)
-                pygame.mixer.music.play(-1)
-            last = "d"
+        elif keyboard.is_pressed('down'):
+            curr = "d"
+            if curr != last:
+                if condition == "tactile":
+                    belt_controller.vibrate_at_angle(60, channel_index=0)
+                elif condition == "auditory":
+                    pygame.mixer.music.load(audio_down)
+                    pygame.mixer.music.play(-1)
+                last = curr
         # Present left stimulus.
-        if keyboard.is_pressed('left') and last != "l":
-            if condition == "tactile":
-                belt_controller.vibrate_at_angle(45, channel_index=0)
-            elif condition == "auditory":
-                pygame.mixer.music.load(audio_left)
-                pygame.mixer.music.play(-1)
-            last = "l"
+        elif keyboard.is_pressed('left'):
+            curr = "l"
+            if curr != last:
+                if condition == "tactile":
+                    belt_controller.vibrate_at_angle(45, channel_index=0)
+                elif condition == "auditory":
+                    pygame.mixer.music.load(audio_left)
+                    pygame.mixer.music.play(-1)
+                last = curr
         # Present forward stimulus.
-        if keyboard.is_pressed('f') and last != "f":
-            if condition == "tactile":
-                belt_controller.send_pulse_command(
-                    channel_index=0,
-                    orientation_type=BeltOrientationType.ANGLE,
-                    orientation=90,
-                    intensity=None,
-                    on_duration_ms=150,
-                    pulse_period=500,
-                    pulse_iterations=9,
-                    series_period=5000,
-                    series_iterations=3,
-                    timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                    exclusive_channel=False,
-                    clear_other_channels=False
-                    )
-            elif condition == "auditory":
-                pygame.mixer.music.load(audio_forward)
-                pygame.mixer.music.play(-1)
-            last = "f"
+        elif keyboard.is_pressed('f'):
+            curr = "f"
+            if curr != last:
+                if condition == "tactile":
+                    belt_controller.send_pulse_command(
+                        channel_index=0,
+                        orientation_type=BeltOrientationType.ANGLE,
+                        orientation=90,
+                        intensity=None,
+                        on_duration_ms=150,
+                        pulse_period=500,
+                        pulse_iterations=9,
+                        series_period=5000,
+                        series_iterations=3,
+                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                        exclusive_channel=False,
+                        clear_other_channels=False
+                        )
+                elif condition == "auditory":
+                    pygame.mixer.music.load(audio_forward)
+                    pygame.mixer.music.play(-1)
+                last = curr
         # Quit.
         if keyboard.is_pressed("q"):
             if condition == "tactile":
@@ -504,7 +534,7 @@ def write_to_csv(id, observations, task):
     elif task == "stimuli":
         filepath = str(id + "_stimuli" + ".csv")
 
-    with open(filepath, 'w') as file:
+    with open(filepath, 'w', newline="") as file:
         writer = csv.writer(file)
         for list in obs:
             writer.writerow(list)

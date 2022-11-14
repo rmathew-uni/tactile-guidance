@@ -74,8 +74,8 @@ def main():
         if user_in == 2:
             user_in = get_input("Tactile or auditory condition? [1,2]", type_=int, min_=1, max_=2)
             if user_in == 1:
-                grasping_task("tactile")
-                #grasping_task_tactile()
+                #grasping_task("tactile")
+                grasping_task_tactile()
                 print(obs_grasping)
                 write_to_csv(participantID, obs_grasping, "grasping")
             elif user_in == 2:
@@ -563,6 +563,7 @@ def grasping_task_tactile():
                     if curr != last:
                         last = curr
                         num_instructions += 1
+                        print("Instruction+")
                     #time.sleep(0.5)
                     break
                 elif keyboard.is_pressed('left') and not new_trial:
@@ -572,6 +573,7 @@ def grasping_task_tactile():
                     if curr != last:
                         last = curr
                         num_instructions += 1
+                        print("Instruction+")
                     #time.sleep(0.5)
                     break
                 elif keyboard.is_pressed('down') and not new_trial:
@@ -579,6 +581,7 @@ def grasping_task_tactile():
                     if curr != last:
                         last = curr
                         num_instructions += 1
+                        print("Instruction+")
                     belt_controller.vibrate_at_angle(60, channel_index=0)
                    # print("down")
 
@@ -589,6 +592,7 @@ def grasping_task_tactile():
                     if curr != last:
                         last = curr
                         num_instructions += 1
+                        print("Instruction+")
                     belt_controller.vibrate_at_angle(90, channel_index=0)
                    # print("up")
 
@@ -613,6 +617,7 @@ def grasping_task_tactile():
                     if curr != last:
                         last = curr
                         num_instructions += 1
+                        print("Instruction+")
 
                     break
                 else:
