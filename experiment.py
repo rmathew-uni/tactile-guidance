@@ -227,10 +227,9 @@ def grasping_task(condition):
     
     new_trial = True
     num_instructions = 0
-    time_limit = 30
+    time_limit = 20
     curr = ""
     last = ""
-    time_limit = 30
     begin = 0
     target_idx = 0
     rep_idx = 0
