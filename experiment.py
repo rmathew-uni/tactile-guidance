@@ -28,7 +28,7 @@ belt_controller = BeltController(belt_controller_delegate)
 obs_localization = []
 block_localization = 1
 presented_stimuli_localization = []
-obs_grasping = [["time", "num_instructions", "condition", "block", "success"]]
+obs_grasping = [["time", "num_instructions", "location", "block", "condition", "success"]]
 block_grasping = 1
 
 
