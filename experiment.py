@@ -102,7 +102,7 @@ def localization_task():
                 stop = False
                 while not stop:
                     print("Current block is number " + str(block_localization))
-                    stimuli = [45,60,90,120] # List of orientations
+                    stimuli = [45,45,45,45,60,60,60,60,90,90,90,90,120,120,120,120] # List of orientations
 
                     random.shuffle(stimuli) # Shuffle orientations
                     obs_localization.append([])
