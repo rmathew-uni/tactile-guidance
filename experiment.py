@@ -30,6 +30,7 @@ block_localization = 1
 presented_stimuli_localization = []
 obs_grasping = [["time", "num_instructions", "location", "block", "condition", "success"]]
 block_grasping = 1
+vibration_intensity = 100
 
 
 def main():
@@ -124,7 +125,7 @@ def localization_task():
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
                         orientation=stimulus,
-                        intensity=None,
+                        intensity=vibration_intensity,
                         on_duration_ms=500,
                         pulse_period=2000,
                         pulse_iterations=1,
@@ -150,7 +151,7 @@ def localization_task():
                     channel_index=0,
                     orientation_type=BeltOrientationType.ANGLE,
                     orientation=90,
-                    intensity=None,
+                    intensity=vibration_intensity,
                     on_duration_ms=500,
                     pulse_period=2000,
                     pulse_iterations=1,
@@ -166,7 +167,7 @@ def localization_task():
                     channel_index=0,
                     orientation_type=BeltOrientationType.ANGLE,
                     orientation=120,
-                    intensity=None,
+                    intensity=vibration_intensity,
                     on_duration_ms=500,
                     pulse_period=1000,
                     pulse_iterations=1,
@@ -182,7 +183,7 @@ def localization_task():
                     channel_index=0,
                     orientation_type=BeltOrientationType.ANGLE,
                     orientation=60,
-                    intensity=None,
+                    intensity=vibration_intensity,
                     on_duration_ms=500,
                     pulse_period=1000,
                     pulse_iterations=1,
@@ -198,7 +199,7 @@ def localization_task():
                     channel_index=0,
                     orientation_type=BeltOrientationType.ANGLE,
                     orientation=45,
-                    intensity=None,
+                    intensity=vibration_intensity,
                     on_duration_ms=500,
                     pulse_period=1000,
                     pulse_iterations=1,
@@ -227,7 +228,7 @@ def grasping_task(condition):
     
     new_trial = True
     num_instructions = 0
-    time_limit = 20
+    time_limit = 1
     curr = ""
     last = ""
     begin = 0
@@ -236,6 +237,7 @@ def grasping_task(condition):
     target_list = list(range(1,10))
     random.shuffle(target_list)
     rep_list = []
+    time_limit_reached = True
     # Present example stimuli.
     user_in = get_input("Present example stimuli? [y,n]", range_=("y","n"))
     if user_in == "y":
@@ -267,21 +269,6 @@ def grasping_task(condition):
                     #num_instructions += 1
                     new_trial = False
         
-        # Check time limit.
-        elif(begin != 0):
-            if(time.perf_counter() - begin > time_limit) and not new_trial:
-                if condition == "tactile":
-                    belt_controller.stop_vibration()
-                    obs_grasping.append([time_limit, num_instructions, target_idx, block_tactile, "tactile", "fail"])
-                elif condition == "auditory":
-                    pygame.mixer.music.stop()
-                    obs_grasping.append([time_limit, num_instructions, target_idx, block_auditory, "auditory", "fail"])
-                print("stop")
-                print("Time limit reached.")
-                num_instructions = 0
-                new_trial = True
-                #break
-
         # Quit the task.
         if keyboard.is_pressed("q"):
             if condition == "tactile":
@@ -290,28 +277,37 @@ def grasping_task(condition):
                 pygame.mixer.music.stop()
             return
         
+        # Check time limit.
+        elif(begin != 0):
+            if(time.perf_counter() - begin > time_limit) and not new_trial:
+                time_limit_reached = True
+        
         # Stop the trial, calculate the time and append the observations.
-        elif keyboard.is_pressed('s') and not new_trial:
-            end = time.perf_counter()
-            elapsed = end - begin # Calculate trial time.
+        elif (keyboard.is_pressed('s') or (time_limit_reached)) and not new_trial:
             if condition == "tactile":
                 belt_controller.stop_vibration()
             elif condition == "auditory":
                 pygame.mixer.music.stop()
             print("stop")
-            new_trial = True
-            print("Trial completed.")
-            print("Completion time is ", elapsed, "seconds.")
-            result = get_input("Press s for success, d for fail or f for experimenter fail.[s,d,f]", type_=str, range_=("s","d","f"))
-            if result == "s": result = "success"
-            elif result == "d": result = "fail"
-            # Experimenter fail, append target to repetion list.
-            else: 
-                result = "exFail"
-                if target_idx < 9: # Check if all targets have been recorded before.
-                    rep_list.append(target_list[target_idx]) # Append target where experimenter failed to repetition list.
-                else: # If all targets have been recorded.
-                    rep_list.append(rep_list[rep_idx]) 
+            if time_limit_reached:
+                elapsed = time_limit
+                result = "fail"
+                print("Time limit reached.")
+            if not time_limit_reached:
+                end = time.perf_counter()
+                elapsed = end - begin # Calculate trial time.
+                print("Trial completed.")
+                print("Completion time is ", elapsed, "seconds.")
+                result = get_input("Press s for success, d for fail or f for experimenter fail.[s,d,f]", type_=str, range_=("s","d","f"))
+                if result == "s": result = "success"
+                elif result == "d": result = "fail"
+                # Experimenter fail, append target to repetion list.
+                else: 
+                    result = "exFail"
+                    if target_idx < 9: # Check if all targets have been recorded before.
+                        rep_list.append(target_list[target_idx]) # Append target where experimenter failed to repetition list.
+                    else: # If all targets have been recorded.
+                        rep_list.append(rep_list[rep_idx]) 
             # No experimenter fail.
             if target_idx < 9: 
                 if condition == "tactile": 
@@ -327,6 +323,8 @@ def grasping_task(condition):
                     rep_idx += 1
             num_instructions = 0
             last = ""
+            new_trial = True
+            time_limit_reached = False
             target_idx += 1
             if target_idx > 8: # Check if all targets have been recorded.
                 if len(rep_list) != 0: # Check if targets must be repeated.
@@ -350,7 +348,7 @@ def grasping_task(condition):
             curr = "r"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(120, channel_index=0)
+                    belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_right)
                     pygame.mixer.music.play(-1)
@@ -363,7 +361,7 @@ def grasping_task(condition):
             curr = "l"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(45, channel_index=0)
+                    belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_left)
                     pygame.mixer.music.play(-1)
@@ -376,7 +374,7 @@ def grasping_task(condition):
             curr = "d"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(60, channel_index=0)
+                    belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_down)
                     pygame.mixer.music.play(-1)
@@ -389,7 +387,7 @@ def grasping_task(condition):
             curr = "u"
             if last != curr:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(90, channel_index=0)
+                    belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_up)
                     pygame.mixer.music.play(-1)
@@ -406,7 +404,7 @@ def grasping_task(condition):
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
                         orientation=90,
-                        intensity=None,
+                        intensity=vibration_intensity,
                         on_duration_ms=150,
                         pulse_period=500,
                         pulse_iterations=9,
@@ -453,7 +451,7 @@ def present_example_stimuli(condition):
             curr = "r"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(120, channel_index=0)
+                    belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_right)
                     pygame.mixer.music.play(-1)
@@ -463,7 +461,7 @@ def present_example_stimuli(condition):
             curr = "u"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(90, channel_index=0)
+                    belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_up)
                     pygame.mixer.music.play(-1)
@@ -473,7 +471,7 @@ def present_example_stimuli(condition):
             curr = "d"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(60, channel_index=0)
+                    belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_down)
                     pygame.mixer.music.play(-1)
@@ -483,7 +481,7 @@ def present_example_stimuli(condition):
             curr = "l"
             if curr != last:
                 if condition == "tactile":
-                    belt_controller.vibrate_at_angle(45, channel_index=0)
+                    belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
                 elif condition == "auditory":
                     pygame.mixer.music.load(audio_left)
                     pygame.mixer.music.play(-1)
@@ -497,7 +495,7 @@ def present_example_stimuli(condition):
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
                         orientation=90,
-                        intensity=None,
+                        intensity=vibration_intensity,
                         on_duration_ms=150,
                         pulse_period=500,
                         pulse_iterations=9,
