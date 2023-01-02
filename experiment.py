@@ -116,11 +116,11 @@ def localization_task():
                         elif stimulus == 120: trans_stimuli.append("right")
                     presented_stimuli_localization.append(trans_stimuli)
                 
-                    print(stimuli)
+                    #print(stimuli)
 
                     time.sleep(3)
                     for stimulus in stimuli:
-                        print(stimulus)
+                        #print(stimulus)
                         belt_controller.send_pulse_command(
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
@@ -353,7 +353,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_right)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
-                print("Instruction+")
+                #print("Instruction+")
                 last = curr
       
 
@@ -366,7 +366,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_left)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
-                print("Instruction+")
+                #print("Instruction+")
                 last = curr
             
 
@@ -379,7 +379,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_down)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
-                print("Instruction+")
+                #print("Instruction+")
                 last = curr
                 
 
@@ -392,7 +392,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_up)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
-                print("Instruction+")
+                #print("Instruction+")
                 last = curr
 
 
@@ -418,7 +418,7 @@ def grasping_task(condition):
                     pygame.mixer.music.load(audio_forward)
                     pygame.mixer.music.play(-1)
                 num_instructions += 1
-                print("Instruction+")
+                #print("Instruction+")
                 last = curr
 
 
