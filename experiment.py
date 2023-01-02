@@ -228,7 +228,7 @@ def grasping_task(condition):
     
     new_trial = True
     num_instructions = 0
-    time_limit = 1
+    time_limit = 20
     curr = ""
     last = ""
     begin = 0
@@ -237,7 +237,7 @@ def grasping_task(condition):
     target_list = list(range(1,10))
     random.shuffle(target_list)
     rep_list = []
-    time_limit_reached = True
+    time_limit_reached = False
     # Present example stimuli.
     user_in = get_input("Present example stimuli? [y,n]", range_=("y","n"))
     if user_in == "y":
@@ -263,7 +263,7 @@ def grasping_task(condition):
 
     while True:
         # Check for start of trial.
-        if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down")) and new_trial and not keyboard.is_pressed("s"):
+        if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down") or keyboard.is_pressed("f")) and new_trial and not keyboard.is_pressed("s"):
                     begin = time.perf_counter()
                     #print(begin)
                     #num_instructions += 1
@@ -278,12 +278,12 @@ def grasping_task(condition):
             return
         
         # Check time limit.
-        elif(begin != 0):
+        if(begin != 0):
             if(time.perf_counter() - begin > time_limit) and not new_trial:
                 time_limit_reached = True
         
         # Stop the trial, calculate the time and append the observations.
-        elif (keyboard.is_pressed('s') or (time_limit_reached)) and not new_trial:
+        if (keyboard.is_pressed('s') or (time_limit_reached)) and not new_trial:
             if condition == "tactile":
                 belt_controller.stop_vibration()
             elif condition == "auditory":
@@ -344,7 +344,7 @@ def grasping_task(condition):
             #time.sleep(0.5)
             #break
 
-        if keyboard.is_pressed('right') and not new_trial:
+        elif keyboard.is_pressed('right') and not new_trial:
             curr = "r"
             if curr != last:
                 if condition == "tactile":
