@@ -234,7 +234,8 @@ def grasping_task(condition):
     begin = 0
     target_idx = 0
     rep_idx = 0
-    target_list = list(range(1,10))
+    #target_list = list(range(1,10))
+    target_list = [1,2,3,4,6,7,8,9]
     random.shuffle(target_list)
     rep_list = []
     time_limit_reached = False
@@ -304,12 +305,12 @@ def grasping_task(condition):
                 # Experimenter fail, append target to repetion list.
                 else: 
                     result = "exFail"
-                    if target_idx < 9: # Check if all targets have been recorded before.
+                    if target_idx < len(target_list): # Check if all targets have been recorded before.
                         rep_list.append(target_list[target_idx]) # Append target where experimenter failed to repetition list.
                     else: # If all targets have been recorded.
                         rep_list.append(rep_list[rep_idx]) 
             # No experimenter fail.
-            if target_idx < 9: 
+            if target_idx < len(target_list): 
                 if condition == "tactile": 
                     obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_tactile, "tactile", result])
                 elif condition == "auditory":
@@ -326,7 +327,7 @@ def grasping_task(condition):
             new_trial = True
             time_limit_reached = False
             target_idx += 1
-            if target_idx > 8: # Check if all targets have been recorded.
+            if target_idx > len(target_list)-1: # Check if all targets have been recorded.
                 if len(rep_list) != 0: # Check if targets must be repeated.
                     if len(rep_list) > rep_idx:
                         print("Repetition target:" + str(rep_list[rep_idx])) 
