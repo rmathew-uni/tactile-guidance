@@ -258,7 +258,6 @@ def grasping_task(condition):
     while True:
         # Check for start of trial.
         if (keyboard.is_pressed("left") or keyboard.is_pressed("right") or keyboard.is_pressed("up") or keyboard.is_pressed("down") or keyboard.is_pressed("f")) and new_trial and not keyboard.is_pressed("s"):
-            print('tried this')
             begin = time.perf_counter()
             #print(begin)
             #num_instructions += 1
