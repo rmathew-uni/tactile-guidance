@@ -230,7 +230,7 @@ def grasping_task(condition):
     target_idx = 0
     rep_idx = 0
     #target_list = list(range(1,10))
-    target_list = [1,2,3,4,6,7,8,9]
+    target_list = [1,2,3,4,5,6,7,8,9]
     random.shuffle(target_list)
     rep_list = []
     time_limit_reached = False

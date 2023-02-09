@@ -1,0 +1,10 @@
+time,num_instructions,location,block,condition,success
+3.5097985000000023,1,9,1,tactile,success
+1.6630122999999983,1,2,1,tactile,success
+1.3152423000000013,1,8,1,tactile,success
+1.4995708000000008,1,5,1,tactile,success
+1.2523466000000099,1,7,1,tactile,success
+0.6530707000000007,1,4,1,tactile,success
+0.9765510999999947,2,3,1,tactile,success
+0.8565842000000004,1,6,1,tactile,success
+0.7393098000000009,1,1,1,tactile,success
