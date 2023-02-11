@@ -555,12 +555,16 @@ def collect_response():
     while time.perf_counter() - time_post_stim < 3: # Listen to keyboard input for 3 seconds.
         if keyboard.is_pressed("left"):
             response = "left"
+            print("Left")
         if keyboard.is_pressed("right"):
             response = "right"
+            print("Right")
         if keyboard.is_pressed("up"):
             response = "up"
+            print("Up")
         if keyboard.is_pressed("down"):
             response = "down"
+            print("Down")
     if response == "":
         response = "no response"
     return response
