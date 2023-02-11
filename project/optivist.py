@@ -343,7 +343,7 @@ def grasping_task(condition):
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
                 num_instructions += 1
-                #print("Instruction+")
+                print("Right")
                 last = curr
       
 
@@ -353,7 +353,7 @@ def grasping_task(condition):
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
                 num_instructions += 1
-                #print("Instruction+")
+                print("Left")
                 last = curr
             
 
@@ -363,7 +363,7 @@ def grasping_task(condition):
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
                 num_instructions += 1
-                #print("Instruction+")
+                print("Down")
                 last = curr
                 
 
@@ -373,7 +373,7 @@ def grasping_task(condition):
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
                 num_instructions += 1
-                #print("Instruction+")
+                print("Up")
                 last = curr
 
 
@@ -396,7 +396,7 @@ def grasping_task(condition):
                         clear_other_channels=False
                     )
                 num_instructions += 1
-                #print("Instruction+")
+                print("Forward")
                 last = curr
 
         elif keyboard.is_pressed('g') and not new_trial:
@@ -418,7 +418,7 @@ def grasping_task(condition):
                         clear_other_channels=False
                     )
                 num_instructions += 1
-                #print("Instruction+")
+                print("Grasp")
                 last = curr
 
 
@@ -443,6 +443,7 @@ def present_example_stimuli(condition):
             if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+                print("Right")
                 last = curr
         # Present up stimulus.
         elif keyboard.is_pressed('up'):
@@ -450,6 +451,7 @@ def present_example_stimuli(condition):
             if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+                print("Up")
                 last = curr
         #Present down stimulus.
         elif keyboard.is_pressed('down'):
@@ -457,6 +459,7 @@ def present_example_stimuli(condition):
             if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+                print("Down")
                 last = curr
         # Present left stimulus.
         elif keyboard.is_pressed('left'):
@@ -464,6 +467,7 @@ def present_example_stimuli(condition):
             if curr != last:
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+                print("Left")
                 last = curr
         # Present forward stimulus.
         elif keyboard.is_pressed('f'):
@@ -484,6 +488,7 @@ def present_example_stimuli(condition):
                         exclusive_channel=False,
                         clear_other_channels=False
                         )
+                print("Forward")
                 last = curr
 
         elif keyboard.is_pressed('g'):
@@ -504,6 +509,7 @@ def present_example_stimuli(condition):
                         exclusive_channel=False,
                         clear_other_channels=False
                         )
+                print("Grasp")
                 last = curr
 
         # Quit.
