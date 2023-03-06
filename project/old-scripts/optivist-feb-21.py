@@ -12,9 +12,8 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltVibrationTimerOption)
 
 from connect import interactive_belt_connect, setup_logger
+   
 
-import os.path   
-import numpy as np
 
 class Delegate(BeltControllerDelegate):
     # Belt controller delegate
@@ -30,10 +29,28 @@ belt_controller = BeltController(belt_controller_delegate)
 obs_localization = []
 block_localization = 1
 presented_stimuli_localization = []
-obs_grasping_t = [["time", "num_instructions", "location", "block", "condition", "success"]]
-obs_grasping_a = [["time", "num_instructions", "location", "block", "condition", "success"]]
+obs_grasping = [["time", "num_instructions", "location", "block", "condition", "success"]]
+block_grasping = 1
 vibration_intensity = 100
 
+
+
+
+# for tactile
+# list of numbers repeated 8 times
+numbers_t =  [i for i in range(1,10)] * 8
+# shuffle the list
+random.shuffle(numbers_t)
+# split the shuffled list into 8 block 
+targets_t = [numbers_t[i:i+9] for i in range(0, len(numbers_t), 9)]
+
+# for auditory
+# list of numbers repeated 8 times
+numbers_a =  [i for i in range(1,10)] * 8
+# shuffle the list
+random.shuffle(numbers_a)
+# split the shuffled list into 8 block 
+targets_a = [numbers_a[i:i+9] for i in range(0, len(numbers_a), 9)]
 
 
 def main():
@@ -58,40 +75,6 @@ def main():
             print("Participant ID: " + participantID)
             continue
 
-
-    # for tactile
-    global targets_t
-
-    if os.path.isfile(f'{participantID}_targets_t.csv'):
-        targets_t = np.loadtxt(f'{participantID}_targets_t.csv', delimiter=',', dtype=int)
-        
-     
-    else:
-        # list of numbers repeated 8 times
-        numbers_t =  [i for i in range(1,10)] * 8
-        # shuffle the list
-        random.shuffle(numbers_t)
-        # split the shuffled list into 8 block 
-        targets_t = [numbers_t[i:i+9] for i in range(0, len(numbers_t), 9)]
-        np.savetxt(f'{participantID}_targets_t.csv', targets_t, delimiter=',', fmt="%d")
-        
-
-    # for auditory
-    global targets_a
-    
-    if os.path.isfile(f'{participantID}_targets_a.csv'):
-        targets_a = np.loadtxt(f'{participantID}_targets_a.csv', delimiter=',', dtype=int)
-
-    else:
-        # list of numbers repeated 8 times
-        numbers_a =  [i for i in range(1,10)] * 8
-        # shuffle the list
-        random.shuffle(numbers_a)
-        # split the shuffled list into 8 block 
-        targets_a = [numbers_a[i:i+9] for i in range(0, len(numbers_a), 9)]
-        np.savetxt(f'{participantID}_targets_a.csv', targets_a, delimiter=',', fmt="%d")
-
-
     coinflip = random.sample([0,1], 1)[0]
 
     if coinflip==0:
@@ -100,9 +83,6 @@ def main():
         print("Condition: Auditory")
 
     print("Press 1 to start the localization task. Press 2 to start the grasping task.")
-
-    prev_block_auditory = 0
-    prev_block_tactile = 0
 
 # Select localization or grasping task.
     while True:
@@ -120,16 +100,15 @@ def main():
         if user_in == 2:
             user_in = get_input("Tactile or auditory condition?. Press 0 to return. [1,2,0]", type_=int, min_=0, max_=2)
             if user_in == 1:
-                prev_block_tactile = grasping_task("tactile",prev_block_tactile)
-                write_to_csv(participantID, obs_grasping_t, "grasping_t")
+                grasping_task("tactile")
+                print(obs_grasping)
+                write_to_csv(participantID, obs_grasping, "grasping")
             elif user_in == 2:
                 print("Auditory condition selected. You will guide the participant to the correct fruit verbally.")
-                prev_block_auditory = grasping_task("auditory",prev_block_auditory)
-                write_to_csv(participantID, obs_grasping_a, "grasping_a")
+                grasping_task("auditory")
+                write_to_csv(participantID, obs_grasping, "grasping")
             elif user_in == 0:
                 continue
-        
-
 
 def localization_task():
     while belt_controller.get_connection_state() == BeltConnectionState.CONNECTED:
@@ -261,7 +240,7 @@ def localization_task():
             if user_in.lower() == "q":
                 return
 
-def grasping_task(condition,prev):
+def grasping_task(condition):
 
     new_trial = True
     num_instructions = 0
@@ -288,16 +267,12 @@ def grasping_task(condition,prev):
 
     # Get block number or quit.
     if condition == "tactile":
-        print("The previous block number was " + str(prev))
         block_tactile = get_input("Enter a block number or press 0 to quit the task.", type_=int, min_=0)
-        prev = block_tactile
         target_list = targets_t[block_tactile -1]
         if block_tactile == 0: # Quit if user enters 0.
             return
     if condition == "auditory":
-        print("The previous block number was " + str(prev))
         block_auditory = get_input("Enter a block number or press 0 to quit the task.", type_=int, min_=0)
-        prev = block_auditory
         target_list = targets_a[block_auditory -1]
         if block_auditory == 0: # Quit if user enters 0.
             return
@@ -355,37 +330,36 @@ def grasping_task(condition,prev):
             # No experimenter fail.
             if target_idx < len(target_list): 
                 if condition == "tactile": 
-                    obs_grasping_t.append([elapsed, num_instructions, target_list[target_idx], block_tactile, "tactile", result])
+                    obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_tactile, "tactile", result])
                 elif condition == "auditory":
-                    obs_grasping_a.append([elapsed, num_instructions, target_list[target_idx], block_auditory, "auditory", result])
+                    obs_grasping.append([elapsed, num_instructions, target_list[target_idx], block_auditory, "auditory", result])
 
             elif len(rep_list) > rep_idx:
                 if condition == "tactile":
-                    obs_grasping_t.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_grasping, "tactile", result])
+                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_grasping, "tactile", result])
                     rep_idx += 1
                 elif condition == "auditory":
-                    obs_grasping_a.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_auditory, "auditory", result])
+                    obs_grasping.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_auditory, "auditory", result])
                     rep_idx += 1
-
             num_instructions = 0
             last = ""
             new_trial = True
             time_limit_reached = False
             target_idx += 1
-
             if target_idx > len(target_list)-1: # Check if all targets have been recorded.
                 if len(rep_list) != 0: # Check if targets must be repeated.
                     if len(rep_list) > rep_idx:
                         print("Repetition target:" + str(rep_list[rep_idx])) 
+                        #
                         # print(rep_list)
                         #rep_idx += 1
                         
                     else: 
                         print("Block finished!")
-                        return prev
+                        return
                 else: 
                     print("Block finished!")
-                    return prev
+                    return
             else: print(target_list[target_idx]) # Print target.                    
         
             #time.sleep(0.5)
@@ -539,16 +513,13 @@ def write_to_csv(id, observations, task):
     if task == "localization":
         filepath = str(id + "_localization" + ".csv")
 
-    elif task == "grasping_t":
-        filepath = str(id + "_grasping_t" + ".csv")
-
-    elif task == "grasping_a":
-        filepath = str(id + "_grasping_a" + ".csv")
+    elif task == "grasping":
+        filepath = str(id + "_grasping" + ".csv")
     
     elif task == "stimuli":
         filepath = str(id + "_stimuli" + ".csv")
 
-    with open(filepath, 'a', newline="") as file:
+    with open(filepath, 'a+', newline="") as file:
         writer = csv.writer(file)
         for list in obs:
             writer.writerow(list)
