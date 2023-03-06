@@ -34,8 +34,6 @@ obs_grasping_t = [["time", "num_instructions", "location", "block", "condition",
 obs_grasping_a = [["time", "num_instructions", "location", "block", "condition", "success"]]
 vibration_intensity = 100
 
-
-
 def main():
 
     print("Welcome to the \"Augmenting functional vision using tactile guidance\" experiment!")
@@ -58,14 +56,12 @@ def main():
             print("Participant ID: " + participantID)
             continue
 
-
     # for tactile
     global targets_t
 
     if os.path.isfile(f'{participantID}_targets_t.csv'):
         targets_t = np.loadtxt(f'{participantID}_targets_t.csv', delimiter=',', dtype=int)
         
-     
     else:
         # list of numbers repeated 8 times
         numbers_t =  [i for i in range(1,10)] * 8
@@ -73,8 +69,7 @@ def main():
         random.shuffle(numbers_t)
         # split the shuffled list into 8 block 
         targets_t = [numbers_t[i:i+9] for i in range(0, len(numbers_t), 9)]
-        np.savetxt(f'{participantID}_targets_t.csv', targets_t, delimiter=',', fmt="%d")
-        
+        np.savetxt(f'{participantID}_targets_t.csv', targets_t, delimiter=',', fmt="%d")  
 
     # for auditory
     global targets_a
@@ -90,7 +85,6 @@ def main():
         # split the shuffled list into 8 block 
         targets_a = [numbers_a[i:i+9] for i in range(0, len(numbers_a), 9)]
         np.savetxt(f'{participantID}_targets_a.csv', targets_a, delimiter=',', fmt="%d")
-
 
     coinflip = random.sample([0,1], 1)[0]
 
@@ -129,8 +123,6 @@ def main():
             elif user_in == 0:
                 continue
         
-
-
 def localization_task():
     while belt_controller.get_connection_state() == BeltConnectionState.CONNECTED:
         print("Q. to quit.")
@@ -294,6 +286,7 @@ def grasping_task(condition,prev):
         target_list = targets_t[block_tactile -1]
         if block_tactile == 0: # Quit if user enters 0.
             return
+        
     if condition == "auditory":
         print("The previous block number was " + str(prev))
         block_auditory = get_input("Enter a block number or press 0 to quit the task.", type_=int, min_=0)
@@ -361,7 +354,7 @@ def grasping_task(condition,prev):
 
             elif len(rep_list) > rep_idx:
                 if condition == "tactile":
-                    obs_grasping_t.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_grasping, "tactile", result])
+                    obs_grasping_t.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_tactile, "tactile", result])
                     rep_idx += 1
                 elif condition == "auditory":
                     obs_grasping_a.append([elapsed, num_instructions, "rep_" + str(rep_list[rep_idx]), block_auditory, "auditory", result])
@@ -452,8 +445,6 @@ def grasping_task(condition,prev):
                 num_instructions += 1
                 print("Grasp")
                 last = curr
-
-
 
 def present_example_stimuli(condition):
 
@@ -666,4 +657,3 @@ def calc_accuracy():
 
 if __name__ == "__main__":
     main()
-
