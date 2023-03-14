@@ -365,6 +365,7 @@ def grasping_task(condition,prev):
             new_trial = True
             time_limit_reached = False
             target_idx += 1
+            # user_in
 
             if target_idx > len(target_list)-1: # Check if all targets have been recorded.
                 if len(rep_list) != 0: # Check if targets must be repeated.
@@ -393,6 +394,7 @@ def grasping_task(condition,prev):
                 print("Right")
                 last = curr
       
+    
 
         elif keyboard.is_pressed('left') and not new_trial:
             curr = "l"
