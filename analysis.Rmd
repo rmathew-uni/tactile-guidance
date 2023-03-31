@@ -1,0 +1,218 @@
+---
+title: "OptiVisT grasping analysis"
+author: "Florian Pätzold, Ramon Zacharias"
+date: "3/21/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+Import all necessary packages.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(EnvStats)
+library(outliers)
+```
+
+# Data preprocessing
+
+Set working directory, load all the grasping data, clean it and combine it into one dataframe.
+
+```{r}
+# Set working directory to the folder containing the CSV files
+setwd("data")
+# Get list of all CSV files for the grapsing task in the folder
+file_list <- list.files(getwd(), pattern = "*grasping*")
+# Delete testing data file
+file_list <- file_list[file_list != "1111_grasping.csv"]
+# Create an empty data frame to store the combined data
+combined_data <- data.frame()
+# Create inverted %in% function
+`%ni%` <- Negate(`%in%`)
+# Loop through each CSV file
+for (file in file_list) {
+  # Read the CSV file into a data frame
+  file_data <- read.csv(file, header = TRUE, sep = ",")
+  
+  # Extract the number from the filename and add as a new column
+  number <- as.numeric(gsub("[^0-9]+", "", file))
+  file_data$participant_id <- number
+  
+  # More than 3 rep trials for each block is infeasible and must be wrong data saving
+  # Then we only take the last 8 blocks
+  if (length(file_data$location) > 8 * (9+3)) {
+    file_data <- file_data[tail(which(file_data$time == "time"), n=1) + 1 : length(file_data$time), ]
+    file_data <- file_data[complete.cases(file_data), ]
+  }
+  
+  # Cast column types from factor to numeric/char
+  file_data$time <- as.numeric(as.character(file_data$time))
+  file_data$num_instructions <- as.numeric(as.character(file_data$num_instructions))
+  file_data$location <- as.character(file_data$location)
+  file_data$block <- as.numeric(as.character(file_data$block))
+  
+  # Assign the correct block number for repetition trials in the tactile condition of P 1-6
+  transform(file_data, block = as.numeric(block))
+  if (number <= 6 & file_data$condition[1] == "tactile") {
+    for (i in 1:length(file_data$location)) {
+      if (file_data$location[i] %ni% list(1,2,3,4,5,6,7,8,9,"location")) {
+        file_data$block[i] <- file_data$block[i-1] # dtype of col is factor when it should be numeric
+      }
+    }
+  }
+  
+  # Append the data to the combined data frame
+  combined_data <- rbind(combined_data, file_data)
+  
+}
+
+# Save the combined data frame as a CSV file
+row.names(combined_data) <- NULL
+write.csv(combined_data, "combined.csv")
+```
+
+# Data visualization
+
+Calculate summary statistics and visualize aspects of the data.
+
+```{r}
+# Calculate the mean times for each participant
+mean_times <- combined_data %>% 
+  filter(success == "success") %>% 
+  group_by(participant_id, condition) %>% 
+  summarize(mean_time = mean(time))
+
+# Save the mean trial times for each participant by condition
+mean_times_auditory <- subset(mean_times, condition == "auditory")
+mean_times_tactile <- subset(mean_times, condition == "tactile")
+ggplot(mean_times, aes(x = condition, y = mean_time, fill = as.factor(participant_id))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Condition", y = "Mean time", fill = "Participant ID") +
+  theme_bw()
+
+# bar plot: x = fail, exfail (grouped by condition), y = counts
+combined_data %>% group_by(condition, success) %>% count() %>% filter(success != "success") %>%
+  ggplot(aes(x = condition, y = n, fill = success)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = n), position = position_dodge(width = 1), vjust = 2, hjust=0.5) +
+  scale_y_continuous(breaks = scales::pretty_breaks()) +
+  labs(
+    title = "Count of trials with false instruction or response", 
+    x = NULL, 
+    y = "Count \n",
+    subtitle = "in auditory and tactile condition \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), 
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "right", legend.title = element_blank()) + # legend.title = element_blank()
+  scale_fill_discrete(labels = c("experimenter fail", "participant fail"))
+
+# line plot: x = block (grouped by condition --> 2 lines), y = fail counts
+combined_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail")) %>% 
+  ggplot(aes(x = block, y = fail_count, color=condition)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Count of trials with false response per block by condition", 
+    x = "\n Block number", 
+    y = "Fail count \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
+  scale_x_continuous(breaks = c(1:8)) +
+  scale_y_continuous(breaks = c(0:8))
+
+# density plot: x = median df$time (grouped by condition)
+combined_data %>% group_by(condition) %>% filter(success == "success") %>% 
+  ggplot(aes(x = time*1000, color=condition, fill=condition)) +
+  geom_density(alpha=0.5) +
+  labs(
+    title = "Count of trials with false response per block by condition", 
+    x = "\n Reaction time (ms)", 
+    y = "\n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
+  scale_y_continuous(breaks = c())
+
+# box plot: x = condition, y = RT
+combined_data %>% filter(success == "success") %>%
+  ggplot(aes(x = condition, y = time*1000)) +
+  geom_boxplot() +
+  labs(
+    title = "Mean and 25% and 75% reaction time quantiles per condition", 
+    x = NULL, 
+    y = "Reaction time (ms) \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank())
+
+# line plot: x = block (grouped by condition --> 2 lines), y = median/mean RT
+combined_data %>% group_by(block, condition) %>% summarize(mean_time = mean(time*1000)) %>% 
+  ggplot(aes(x = block, y = mean_time, color=condition)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Mean reaction times per block by condition", 
+    x = "\n Block number", 
+    y = "Mean reaction times (ms) \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
+  scale_x_continuous(breaks = c(1:8))
+
+```
+
+# Statistical analysis
+
+### Normality assumption check
+
+```{r}
+# Split the data by condition
+auditory_data <- combined_data[combined_data$condition == "auditory",]
+tactile_data <- combined_data[combined_data$condition == "tactile",]
+# Drop rows where success column is not equal to "success"
+auditory_data <- auditory_data[auditory_data$success == "success",]
+tactile_data <- tactile_data[tactile_data$success == "success",]
+# Check for normality using histogram and normal probability plot for each condition
+par(mfrow=c(2,2)) # create 2x2 plot grid
+# Histogram and normal probability plot for auditory condition
+hist(auditory_data$time, main="Histogram of Auditory Times", xlab="Times")
+qqnorm(auditory_data$time, main="Normal Probability Plot of Auditory Times")
+qqline(auditory_data$time)
+# Histogram and normal probability plot for tactile condition
+hist(tactile_data$time, main="Histogram of Tactile Times", xlab="Times")
+qqnorm(tactile_data$time, main="Normal Probability Plot of Tactile Times")
+qqline(tactile_data$time)
+# Perform Shapiro-Wilk test for normality for each condition
+shapiro.test(auditory_data$time)
+shapiro.test(tactile_data$time)
+# Perform Kolmogorov-Smirnov test for each condition
+ks.test(auditory_data$time, "pnorm", mean(auditory_data$time), sd(auditory_data$time))
+ks.test(tactile_data$time, "pnorm", mean(tactile_data$time), sd(tactile_data$time))
+```
+
+### Outlier detection
+
+```{r}
+# Grubbs' test by condition
+grubbs_results <- by(combined_data$time, combined_data$condition, grubbs.test)
+print(grubbs_results)
+```
+
+### Hypothesis testing
+
+Perform the non-parametric Wilcoxon signed-rank test to compare group medians.
+
+```{r}
+# Perform Wilcoxon signed-rank test
+wilcox.test(auditory_data$time, tactile_data$time, paired = FALSE)
+
+# Perform Wilcoxon signed-rank test on the mean reaction times for each participant
+wilcox.test(mean_times_auditory$mean_time, mean_times_tactile$mean_time, paired = TRUE)
+```
