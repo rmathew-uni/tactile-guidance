@@ -312,7 +312,7 @@ def grasping_task(condition,prev):
         if keyboard.is_pressed("q"):
             if condition == "tactile":
                 belt_controller.stop_vibration()
-            return
+            return #user_in
         
         # Check time limit.
         if(begin != 0):
@@ -322,7 +322,7 @@ def grasping_task(condition,prev):
         # Stop the trial, calculate the time and append the observations.
         if (keyboard.is_pressed("s") or (time_limit_reached)) and not new_trial:
             if condition == "tactile":
-                belt_controller.stop_vibration()
+                belt_controller.stop_vibration() 
 
             if time_limit_reached:
                 elapsed = time_limit
@@ -393,8 +393,8 @@ def grasping_task(condition,prev):
                 num_instructions += 1
                 print("Right")
                 last = curr
-      
-    
+
+
 
         elif keyboard.is_pressed('left') and not new_trial:
             curr = "l"
@@ -402,7 +402,7 @@ def grasping_task(condition,prev):
                 if condition == "tactile":
                     belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
                 num_instructions += 1
-                print("Left")
+                print("Left")   
                 last = curr
             
 
