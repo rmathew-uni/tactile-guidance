@@ -1,3 +1,4 @@
 keyboard==0.13.5
 pygame==2.1.2
 pybelt==1.0.5
+fiftyone
