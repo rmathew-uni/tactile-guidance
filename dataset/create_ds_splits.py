@@ -28,12 +28,48 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
 
     # Calculate the rows in the csv file (# indiv bbox's)
     csvfile = 'fruits_ds_pascal.csv'
+
     with open(csvfile) as f:
         numboxes = sum(1 for line in f)
+
+    with open(csvfile,'r') as file:
+        reader = csv.reader(file)
+
+        apple = 0
+        banana = 0
+        orange = 0
+        grape = 0
+        hand = 0
+
+        for row in reader:
+            if row[3] == 'apple':
+                apple += 1
+
+            elif row[3] == 'banana':
+                banana +=1
+
+            elif row[3] == 'orange':
+                orange +=1
+
+            elif row[3] == 'grape':
+                grape +=1
+
+            elif row[3] == 'hand':
+                hand +=1
 
     train_num = int(numboxes*train_percent)
     val_num = int(numboxes*val_percent)
     test_num = numboxes - train_num - val_num
+
+    print('Dataset Information:')
+    print('Total Boxes: %d' % numboxes)
+    print('Apple Boxes: %d' % apple)
+    print('Banana Boxes: %d' % banana)
+    print('Orange Boxes: %d' % orange)
+    print('Grape Boxes: %d' % grape)
+    print('Hand Boxes: %d' % hand)
+
+    print('Splits Information')
     print('Training Boxes: %d' % train_num)
     print('Validation Boxes: %d' % val_num)
     print('Test Boxes: %d' % test_num)
@@ -50,15 +86,16 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
         chosen_row = random.choice(data)
         img_name = chosen_row[0]
 
-        new_csv_path = train_path + '/train_labels.csv'
+        new_csv = 'train_labels.csv'
+        new_csv_path = train_path + '/' + new_csv
 
         # check if the CSV file exists and if it's empty
         if os.path.isfile(new_csv_path):
             # if the file exists append the new rows without the header
-            with open(csvfile, mode='a', newline='') as f:
+            with open(new_csv_path, mode='a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(chosen_row)
-                print('added row')
+                #print('added row')
         else:
             # if the file does not exist or is empty, write the header and the new rows
 
@@ -67,7 +104,7 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
                 writer = csv.writer(df)
                 writer.writerow(next(reader))
                 writer.writerow(chosen_row)
-                print('created file and added row')
+                #print('created file and added row')
 
         # move the image to train_path folder
         if img_name != 'filename':
@@ -87,15 +124,16 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
         chosen_row = random.choice(data)
         img_name = chosen_row[0]
 
-        new_csv_path = val_path + '/val_labels.csv'
+        new_csv = 'val_labels.csv'
+        new_csv_path = val_path + '/' + new_csv
 
         # check if the CSV file exists and if it's empty
         if os.path.isfile(new_csv_path):
             # if the file exists append the new rows without the header
-            with open(csvfile, mode='a', newline='') as f:
+            with open(new_csv_path, mode='a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(chosen_row)
-                print('added row')
+                #print('added row')
         else:
             # if the file does not exist or is empty, write the header and the new rows
 
@@ -104,7 +142,7 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
                 writer = csv.writer(df)
                 writer.writerow(next(reader))
                 writer.writerow(chosen_row)
-                print('created file and added row')
+                #print('created file and added row')
 
         # move the image to train_path folder
         if img_name != 'filename':
