@@ -6,8 +6,6 @@
 from pathlib import Path
 import random
 import os
-import sys
-import pandas as pd
 import csv
 import shutil
 
@@ -24,10 +22,10 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
     train_path = pth + '/train'
     val_path = pth + '/val'
     test_path = pth + '/test'
-    csv_path = pth + '/fruits_ds_pascal.csv'
+    csv_path = pth + '/fruithands.csv'
 
     # Calculate the rows in the csv file (# indiv bbox's)
-    csvfile = 'fruits_ds_pascal.csv'
+    csvfile = 'fruithands.csv'
 
     with open(csvfile) as f:
         numboxes = sum(1 for line in f)
@@ -38,8 +36,8 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
         apple = 0
         banana = 0
         orange = 0
-        grape = 0
-        hand = 0
+        lefthand = 0
+        righthand = 0
 
         for row in reader:
             if row[3] == 'apple':
@@ -51,11 +49,11 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
             elif row[3] == 'orange':
                 orange +=1
 
-            elif row[3] == 'grape':
-                grape +=1
+            elif row[3] == 'left_hand':
+                lefthand +=1
 
-            elif row[3] == 'hand':
-                hand +=1
+            elif row[3] == 'right_hand':
+                righthand +=1
 
     train_num = int(numboxes*train_percent)
     val_num = int(numboxes*val_percent)
@@ -66,8 +64,9 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
     print('Apple Boxes: %d' % apple)
     print('Banana Boxes: %d' % banana)
     print('Orange Boxes: %d' % orange)
-    print('Grape Boxes: %d' % grape)
-    print('Hand Boxes: %d' % hand)
+    print('Total Hand Boxes: %d, with %d Right and %d Left' % (lefthand+righthand,righthand,lefthand))
+    #print('Left Hand: %d' % lefthand)
+    #print('Right Hand: %d' % righthand)
 
     print('Splits Information')
     print('Training Boxes: %d' % train_num)
@@ -154,17 +153,55 @@ def split_dataset(train_percent=0.9, val_percent=0.05):
         data.remove(chosen_row)
     print("After creation of val ds, data is of size" + str(len(data)))
 
-    # Move remaining files to test folder
+    # Move remaining files to test folder and divide the remaining bounding boxes between training and validation sets (else they don't get used at all, wasted data)
+
+    whichfile = 'val'
 
     for i in range(test_num-1):
         chosen_row = random.choice(data)
         img_name = chosen_row[0]
 
+        if whichfile == 'val':
+            new_csv = 'val_labels.csv'
+            new_csv_path = val_path + '/' + new_csv
+
+            # check if the CSV file exists and if it's empty
+            if os.path.isfile(new_csv_path):
+                # if the file exists append the new rows without the header
+                with open(new_csv_path, mode='a', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(chosen_row)
+            whichfile = 'train'
+
+        elif whichfile == 'train':
+            new_csv = 'train_labels.csv'
+            new_csv_path = train_path + '/' + new_csv
+
+            # check if the CSV file exists and if it's empty
+            if os.path.isfile(new_csv_path):
+                # if the file exists append the new rows without the header
+                with open(new_csv_path, mode='a', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(chosen_row)
+            whichfile = 'val'
+
         original_path = image_path + '/' + img_name
-        new_path = test_path + '/' + img_name
-        shutil.copy(original_path, new_path)
+
+        if whichfile == 'val':
+            new_path = val_path + '/' + img_name
+            shutil.copy(original_path, new_path)
+            print('image to val')
+        if whichfile == 'train':
+            new_path = train_path + '/' + img_name
+            shutil.copy(original_path, new_path)
+            print('image to train')
+
+        test_new_path = test_path + '/' + img_name
+
+        shutil.copy(original_path, test_new_path)
 
         data.remove(chosen_row)
+
     print("After creation of test ds, data is of size" + str(len(data)))
 
 split_dataset()
