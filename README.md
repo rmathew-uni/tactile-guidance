@@ -18,4 +18,4 @@ These results demonstrate the feasibility of tactile guidance of grasping moveme
 
 ### Folder structure
 
-![alt text](https://trello.com/1/cards/650087c61d0715179c9941e1/attachments/6501d528fad5ba16f1445a2c/previews/6501d52bfad5ba16f1445ea3/download/structure.png)
+![folder structure](https://github.com/pippowell/OptiVisT/blob/cleaning/flobox/Resources/Presentations/folder_structure.png)
