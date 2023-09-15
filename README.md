@@ -15,3 +15,7 @@ These results demonstrate the feasibility of tactile guidance of grasping moveme
 [1] Brandebusemeyer C, Luther A R, König S U, König P & Kärcher S M. Impact of a Vibrotactile Belt on Emotionally Challenging Everyday Situations of the Blind. Sensors Basel Switz 21: 7384 (2021).  
 
 [2] Kärcher S M, Fenzlaff S, Hartmann D, Nagel S K & König P. Sensory augmentation for the blind. Front Hum Neurosci 6: 37 (2012).
+
+### Folder structure
+
+![alt text](https://trello.com/1/cards/650087c61d0715179c9941e1/attachments/6501d528fad5ba16f1445a2c/previews/6501d52bfad5ba16f1445ea3/download/structure.png)
