@@ -1,0 +1,73 @@
+---
+title: "OptiVisT questionnaire analysis"
+author: "Florian Pätzold, Ramon Zacharias"
+date: "2023-09-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+Import all necessary packages.
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+# Set working directory to folder with localization files
+setwd("/Users/florian/Documents/Studium/NBP/Projects/OptiVisT/FloBox/analysis/data/questionnaire/")
+# Read in the data
+questionnaire_data <- read.csv("questionnaire.csv")
+```
+
+```{r}
+# Compute summary statistics for each question
+summary(questionnaire_data[,2:18])
+```
+
+```{r}
+# Plot each question with box plot
+for (col in colnames(questionnaire_data)[2:18]) {
+  plot_data <- data.frame(Response = questionnaire_data[, col], Question = gsub("\\.", " ", col))
+  plot_title <- gsub("^X", "", col)
+  plot_title <- gsub("\\.", " ", plot_title)
+
+  plot <- ggplot(plot_data, aes(x = factor(1), y = Response)) +
+    geom_boxplot(fill = "lightblue", color = "black", outlier.shape = NA) +
+    geom_jitter(width = 0.5, height = 0, size = 3, alpha = 0.6, color = "red") +  # add points
+    labs(title = plot_title, x = "", y = "Response") +
+    #theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+    ylim(1, 5)  # set y-axis limits to 1 and 5
+
+  print(plot)
+}
+```
+
+```{r}
+print(questionnaire_data$`Please.describe.your.general.experience.with.the.tactile.bracelet.itself..`)
+```
+*Summary:*  
+- some participants had troubles to distinguish vibration directions especially after fatigue (-> blending)  
+- differences in wrist circumferences can lead to perception of too large/small motors and/or vibration intensity and distinguishing directions can again be influenced by that  
+- grasping cue -> some participants started moving up first --> change it to something else (e.g. all motors vibrate, last direction pulses)  
+- some participants felt too much vibration intensity -> numbs wrist (and forearm) -> fatigues -> harder to distinguish -> less intuitive  
+- one P with troubles distinguishing spoken left-right reported it was easier with the bracelet  
+
+```{r}
+print(questionnaire_data$`Please.describe.your.general.experience.with.the.grasping.task`)
+```
+*Summary:*  
+- grasping anticipation because of regular pattern  
+- one P suggests varying vibration intensity based off of distance to target (depth)  
+- unnatural head movements during the task needed some attention (because of narrow camera angle)  
+- participants easily developed a spatial mapping of the shelf and arrangement of fruits  
+
+```{r}
+print(questionnaire_data$`Do.you.have.any.other.comments.for.us.`)
+```
+
+
+
+
