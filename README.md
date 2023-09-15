@@ -18,4 +18,4 @@ These results demonstrate the feasibility of tactile guidance of grasping moveme
 
 ### Folder structure
 
-![folder structure](https://github.com/pippowell/OptiVisT/blob/cleaning/flobox/Resources/Presentations/folder_structure.png)
+![folder structure](https://github.com/pippowell/OptiVisT/blob/main/flobox/Resources/Presentations/folder_structure.png)
