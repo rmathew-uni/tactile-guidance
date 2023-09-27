@@ -119,23 +119,23 @@ def run(
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
-            im = torch.from_numpy(im).to(model_obj.device)
-            im = im.half() if model_obj.fp16 else im.float()  # uint8 to fp16/32
-            im /= 255  # 0 - 255 to 0.0 - 1.0
-            if len(im.shape) == 3:
-                im = im[None]  # expand for batch dim
+            im_obj = torch.from_numpy(im).to(model_obj.device)
+            im_obj = im_obj.half() if model_obj.fp16 else im_obj.float()  # uint8 to fp16/32
+            im_obj /= 255  # 0 - 255 to 0.0 - 1.0
+            if len(im_obj.shape) == 3:
+                im_obj = im_obj[None]  # expand for batch dim
 
-            im = torch.from_numpy(im).to(model_hand.device)
-            im = im.half() if model_hand.fp16 else im.float()  # uint8 to fp16/32
-            im /= 255  # 0 - 255 to 0.0 - 1.0
-            if len(im.shape) == 3:
-                im = im[None]  # expand for batch dim
+            im_hand = torch.from_numpy(im).to(model_hand.device)
+            im_hand = im_hand.half() if model_hand.fp16 else im_hand.float()  # uint8 to fp16/32
+            im_hand /= 255  # 0 - 255 to 0.0 - 1.0
+            if len(im_hand.shape) == 3:
+                im_hand = im_hand[None]  # expand for batch dim
 
         # Inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-            pred_obj = model_obj(im, augment=augment, visualize=visualize)
-            pred_hand = model_hand(im, augment=augment, visualize=visualize)
+            pred_obj = model_obj(im_obj, augment=augment, visualize=visualize)
+            pred_hand = model_hand(im_hand, augment=augment, visualize=visualize)
 
         # NMS
         with dt[2]:
