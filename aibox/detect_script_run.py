@@ -52,7 +52,8 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 @smart_inference_mode()
 def run(
-        weights=ROOT / 'yolov5s.pt',  # model path or triton URL
+        weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
+        weights_hand=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
@@ -78,7 +79,7 @@ def run(
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        vid_stride=1,  # video frame-rate stride
+        vid_stride=1,  # video frame-rate stride_obj
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -93,34 +94,39 @@ def run(
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
-    # Load model
+    # Load model_obj
     device = select_device(device)
-    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
-    stride, names, pt = model.stride, model.names, model.pt
-    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data, fp16=half)
+    model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data, fp16=half)
+    stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
+    stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
+    imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
 
     # Dataloader
     bs = 1  # batch_size
     if webcam:
         view_img = check_imshow(warn=True)
-        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
         bs = len(dataset)
-    # elif screenshot:
-    #     dataset = LoadScreenshots(source, img_size=imgsz, stride=stride, auto=pt)
-    # else:
-    #     dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
-    # vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
-    model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
+    model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))  # warmup
+    model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))  # warmup
+
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     # Milad s
     bbox_info = []  # Initialize a list to store bounding boxs
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
-            im = torch.from_numpy(im).to(model.device)
-            im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+            im = torch.from_numpy(im).to(model_obj.device)
+            im = im.half() if model_obj.fp16 else im.float()  # uint8 to fp16/32
+            im /= 255  # 0 - 255 to 0.0 - 1.0
+            if len(im.shape) == 3:
+                im = im[None]  # expand for batch dim
+
+            im = torch.from_numpy(im).to(model_hand.device)
+            im = im.half() if model_hand.fp16 else im.float()  # uint8 to fp16/32
             im /= 255  # 0 - 255 to 0.0 - 1.0
             if len(im.shape) == 3:
                 im = im[None]  # expand for batch dim
@@ -128,14 +134,18 @@ def run(
         # Inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-            pred = model(im, augment=augment, visualize=visualize)
+            pred_obj = model_obj(im, augment=augment, visualize=visualize)
+            pred_hand = model_hand(im, augment=augment, visualize=visualize)
 
         # NMS
         with dt[2]:
-            pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-        # Second-stage classifier (optional)
-        # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+            print(pred_obj)
+            print(pred_hand)
+
+        pred = pred_obj.append(pred_hand)
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
@@ -143,8 +153,6 @@ def run(
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f'{i}: '
-            # else:
-            #     p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -152,7 +160,7 @@ def run(
             s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -160,7 +168,7 @@ def run(
                 # Print results
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    s += f"{n} {names_obj[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
@@ -169,7 +177,7 @@ def run(
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
                     bbox_info.append({
                         "class": int(cls),
-                        "label": names[int(cls)],
+                        "label": names_obj[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
@@ -183,10 +191,10 @@ def run(
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
-                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        label = None if hide_labels else (names_obj[c] if hide_conf else f'{names_obj[c]} {conf:.2f}')
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     # if save_crop:
-                    #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                    #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
 
             # Stream results
             im0 = annotator.result()
@@ -232,7 +240,7 @@ def run(
     #     s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
     #     LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     # if update:
-    #     strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+    #     strip_optimizer(weights[0])  # update model_obj (to fix SourceChangeWarning)
 
 # Define parameters
 weights = 'yolov5s.pt'  # Path to the YOLOv5 model weights
