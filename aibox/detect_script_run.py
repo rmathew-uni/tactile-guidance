@@ -143,13 +143,17 @@ def run(
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
 
-            print(pred_obj)
-            print(pred_hand)
 
-        pred = pred_obj.append(pred_hand)
+        pred =  pred_hand + pred_obj
+        #pred = pred_hand
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
+            if i==0:
+                curr_labels = names_hand
+            else:
+                curr_labels = names_obj
+            i = 0
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
@@ -169,7 +173,7 @@ def run(
                 # Print results
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {names_obj[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    s += f"{n} {curr_labels[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
                 for *xyxy, conf, cls in reversed(det):
@@ -178,7 +182,7 @@ def run(
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
                     bbox_info.append({
                         "class": int(cls),
-                        "label": names_obj[int(cls)],
+                        "label": curr_labels[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
@@ -192,7 +196,7 @@ def run(
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
-                        label = None if hide_labels else (names_obj[c] if hide_conf else f'{names_obj[c]} {conf:.2f}')
+                        label = None if hide_labels else (curr_labels[c] if hide_conf else f'{curr_labels[c]} {conf:.2f}')
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     # if save_crop:
                     #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
@@ -234,22 +238,9 @@ def run(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
-    # Print results
-    # t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
-    # LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
-    # if save_txt or save_img:
-    #     s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
-    #     LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
-    # if update:
-    #     strip_optimizer(weights[0])  # update model_obj (to fix SourceChangeWarning)
-
-# Define parameters
-weights = 'yolov5s.pt'  # Path to the YOLOv5 model weights
-source = '0'  # Path to the input image
-
-def main(weights, source):
+def main(weights_obj, weights_hand, source):
     #check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    run(weights=weights, source=source)
+    run(weights_obj=weights_obj, weights_hand= weights_hand, source=source)
 
 
 # if __name__ == '__main__':
