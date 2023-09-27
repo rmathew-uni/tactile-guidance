@@ -55,7 +55,8 @@ def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
         weights_hand=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
-        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+        data_obj=ROOT / 'data/coco.yaml',  # dataset.yaml path
+        data_hand=ROOT / 'data/data.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
@@ -96,8 +97,8 @@ def run(
 
     # Load model_obj
     device = select_device(device)
-    model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data, fp16=half)
-    model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data, fp16=half)
+    model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data_obj, fp16=half)
+    model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data_hand, fp16=half)
     stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
     stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
     imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
