@@ -29,38 +29,73 @@ search_value_hand = "person"
 search_key_obj = "Label"
 search_value_obj = "tv"
 
-# Using a loop to find the index
-index_hand = None
-index_obj = None
-# acquire the latest bbox information about hand and object
-for i, item in reversed(list(enumerate(bbox_info))):
-    if item.get(search_key_hand) == search_value_hand:
-        index_hand = i
-    elif item.get(search_key_obj) == search_value_obj:
-        index_obj = i
-        break
+def navigate_hand(bbox_info, search_key_obj, search_value_obj, search_key_hand, search_value_hand, hor_correct = False, ver_correct = False):
+    # Using a loop to find the index
+    #index_hand = None
+    #index_obj = None
 
-bbox_hand = bbox_info[index_hand].get("Bbox")
-bbox_obj = bbox_info[index_obj].get("Bbox")
+    horizontal, vertical = False, False
 
-x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
-x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
+    max_hand_confidence = 0
+    max_obj_confidence = 0
+
+    print(bbox_info)
+
+    # acquire the latest bbox information about hand and object
+    '''
+    for i, item in reversed(list(enumerate(bbox_info))):
+        if item.get(search_key_hand) == search_value_hand:
+            index_hand = i
+        elif item.get(search_key_obj) == search_value_obj:
+            index_obj = i
+            break
+    '''
+
+    bbox_hand, bbox_obj = None, None
+
+    for bbox in bbox_info:
+        if bbox["label"] == search_key_hand and bbox["confidence"] > max_hand_confidence:
+            bbox_hand = bbox.get("bbox")
+            max_hand_confidence = bbox["confidence"]
+        elif bbox["label"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
+            bbox_obj = bbox.get("bbox")
+            max_obj_confidence = bbox["confidence"]
+
+    if bbox_hand != None and bbox_obj == None and hor_correct and ver_correct:
+        print("G R A S P !")
+        return True, True
+
+    if bbox_hand == None or bbox_obj == None:
+        print("Hand or object not detected")
+        return False, False
+
+    #bbox_hand = bbox_info[index_hand].get("Bbox")
+    #bbox_obj = bbox_info[index_obj].get("Bbox")
+
+    x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
+    x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
 
 
-# This Will be adjusted if within if-loop
-x_threshold = 10
-y_threshold = 10
-# Horizontal movement
-if abs(x_center_hand - x_center_obj) > x_threshold:
-    if x_center_hand < x_center_obj:
-        # Here we use the script for bracelet
-        print("right")
-    elif x_center_hand > x_center_obj:
-        print("left")
+    # This Will be adjusted if within if-loop
+    x_threshold = 10
+    y_threshold = 10
+    # Horizontal movement
+    if abs(x_center_hand - x_center_obj) > x_threshold:
+        if x_center_hand < x_center_obj:
+            # Here we use the script for bracelet
+            print("right")
+        elif x_center_hand > x_center_obj:
+            print("left")
+    else:
+        horizontal = True
 
-# Vertical movement
-if abs(y_center_hand - y_center_obj) > y_threshold:
-    if y_center_hand < y_center_obj:
-        print("down")
-    elif y_center_hand > y_center_obj:
-        print("up")
+    # Vertical movement
+    if abs(y_center_hand - y_center_obj) > y_threshold:
+        if y_center_hand < y_center_obj:
+            print("down")
+        elif y_center_hand > y_center_obj:
+            print("up")
+    else:
+        vertical = True
+
+    return horizontal, vertical

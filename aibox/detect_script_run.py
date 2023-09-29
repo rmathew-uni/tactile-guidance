@@ -49,14 +49,15 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, smart_inference_mode
 
+from box_to_FourDirection import navigate_hand
 
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
         weights_hand=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
-        data_obj=ROOT / 'data/coco.yaml',  # dataset.yaml path
-        data_hand=ROOT / 'data/data.yaml',  # dataset.yaml path
+        #data_obj=ROOT / 'coco.yaml',  # dataset.yaml path
+        #data_hand=ROOT / 'data.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
@@ -67,7 +68,8 @@ def run(
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
-        classes=None,  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
+        classes_obj=67,  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
+        classes_hand=[0,1],
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
         visualize=False,  # visualize features
@@ -97,11 +99,14 @@ def run(
 
     # Load model_obj
     device = select_device(device)
-    model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data_obj, fp16=half)
-    model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data_hand, fp16=half)
+    #model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data_obj, fp16=half)
+    #model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data_hand, fp16=half)
+    model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, fp16=half)
+    model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, fp16=half)
     stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
     stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
     imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
+    #input(data_hand)
 
     # Dataloader
     bs = 1  # batch_size
@@ -117,6 +122,8 @@ def run(
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     # Milad s
     bbox_info = []  # Initialize a list to store bounding boxs
+
+    horizontal_in, vertical_in = False, False
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
@@ -140,12 +147,26 @@ def run(
 
         # NMS
         with dt[2]:
-            pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
-            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+            pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
+            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
 
         pred =  pred_hand + pred_obj
         #pred = pred_hand
+
+        annotators_list = []
+
+        if webcam:  # batch_size >= 1
+            p, im0, frame = path[0], im0s[0].copy(), dataset.count
+            s += f'{0}: '
+
+        p = Path(p)  # to Path
+        save_path = str(save_dir / p.name)  # im.jpg
+        txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+        s += '%gx%g ' % im.shape[2:]  # print string
+        gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+        imc = im0.copy() if save_crop else im0  # for save_crop
+        annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
@@ -155,7 +176,7 @@ def run(
                 curr_labels = names_obj
             i = 0
             seen += 1
-            if webcam:  # batch_size >= 1
+            '''if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f'{i}: '
 
@@ -165,7 +186,7 @@ def run(
             s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))'''
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -201,15 +222,17 @@ def run(
                     # if save_crop:
                     #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
 
-            # Stream results
-            im0 = annotator.result()
-            if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+        # Stream results
+        #for annotator in annotators_list:
+        #    im0 += annotator.result()
+        im0 = annotator.result()
+        if view_img:
+            if platform.system() == 'Linux' and p not in windows:
+                windows.append(p)
+                cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+                cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+            cv2.imshow(str(p), im0)
+            cv2.waitKey(1)  # 1 millisecond
 
 
             #Save results (image with detections)
@@ -237,6 +260,18 @@ def run(
         # Milad e
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+
+        horizontal_out, vertical_out = navigate_hand(bbox_info,"cell phone","cell phone","myright","myright",horizontal_in,vertical_in)
+
+        #horizontal_in, vertical_in = False, False
+
+        if horizontal_out:
+           horizontal_in = True
+        if vertical_out:
+           vertical_in = True
+
+        bbox_info = []
+
 
 def main(weights_obj, weights_hand, source):
     #check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
