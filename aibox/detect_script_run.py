@@ -49,7 +49,7 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, smart_inference_mode
 
-from box_to_FourDirection import navigate_hand
+from bracelet import navigate_hand
 
 @smart_inference_mode()
 def run(
