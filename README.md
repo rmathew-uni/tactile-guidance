@@ -19,3 +19,20 @@ These results demonstrate the feasibility of tactile guidance of grasping moveme
 ### Folder structure
 
 ![folder structure](https://github.com/pippowell/OptiVisT/blob/main/flobox/Resources/Presentations/folder_structure.png)
+
+### Installing Ultralytics
+For the networks to run, you need both the latest ultralytics package (which is actually for YOLOv8) and the separate package for YOLOv5. 
+
+To set up an environment with both, run the following command to install the YOLOv8 package:
+pip install ultralytics 
+
+Then download the YOLOv5 repo from the following [link](https://github.com/ultralytics/yolov5/tree/master). You can either download as a ZIP, clone to a separate repo, etc.
+
+Move the files from the downloaded repo to your current working repo (where the files you want to run are). Update any code references depending on where exactly in your current working repo the YOLOv5 files are. 
+
+You do not need all the YOLOv5 files, just the following:
+- the models folder 
+- the utils folder
+- export.py
+
+If you clone this repo, YOLOv5 is already set up properly and you only need to separately install the YOLOv8 packages into your environment.

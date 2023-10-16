@@ -1,7 +1,6 @@
 import csv
 import random
 import time
-from pathlib import Path
 from random import randrange
 
 import keyboard
@@ -11,7 +10,7 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption)
 
-from connect import interactive_belt_connect, setup_logger
+from aibox.connect import interactive_belt_connect, setup_logger
 
 import os.path   
 import numpy as np
