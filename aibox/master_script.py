@@ -90,9 +90,8 @@ names:
 if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Model weights path
     weights_hand = 'hand_network.pt'
-    source = '1'  # Input image path
-    target_obj = 22
+    source = '0'  # Input image path
     # Add other parameters as needed
 
-    detect_script_run.main(weights_obj, weights_hand, source,target_obj)
+    detect_script_run.main(weights_obj, weights_hand, source)
     

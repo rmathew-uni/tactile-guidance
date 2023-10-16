@@ -19,7 +19,9 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption)
 
-from connect import interactive_belt_connect, setup_logger
+from auto_connect import interactive_belt_connect, setup_logger
+
+import keyboard
 
 class Delegate(BeltControllerDelegate):
     # Belt controller delegate
@@ -60,7 +62,7 @@ search_value_hand = "person"
 search_key_obj = "Label"
 search_value_obj = "tv"
 
-def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False, ver_correct = False):
+def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False, ver_correct = False, grasp=False):
     # Using a loop to find the index
     #index_hand = None
     #index_obj = None
@@ -93,7 +95,9 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
             max_obj_confidence = bbox["confidence"]
 
     if bbox_hand != None and bbox_obj == None and hor_correct and ver_correct:
+
         print("G R A S P !")
+
         belt_controller.send_pulse_command(
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
@@ -108,12 +112,19 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-        return True, True
+
+        input('Press Enter to indicate you have grasped the object')
+
+        belt_controller.stop_vibration()
+
+        grasp = True
+
+        return True, True, grasp
 
     if bbox_hand == None or bbox_obj == None:
         belt_controller.stop_vibration()
         print('no find')
-        return False, False
+        return False, False, False
 
     #bbox_hand = bbox_info[index_hand].get("Bbox")
     #bbox_obj = bbox_info[index_obj].get("Bbox")
@@ -149,4 +160,4 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
     else:
         horizontal = True
 
-    return horizontal, vertical
+    return horizontal, vertical, False

@@ -32,10 +32,11 @@ def interactive_belt_connect(belt_controller):
 
     # Ask for the interface
     #interface = input("Connect via Bluetooth or USB? [b,u]")
-    interface = ""
-    print("Connect via Bluetooth or USB? [b,u]", end="")
-    while interface == "":
-        interface = input()
+    #interface = ""
+    #print("Connect via Bluetooth or USB? [b,u]", end="")
+    #while interface == "":
+    #    interface = input()
+    interface = 'u'
     if interface.lower() == "b":
         # Scan for advertising belt
         with pybelt.belt_scanner.create() as scanner:
@@ -68,7 +69,7 @@ def interactive_belt_connect(belt_controller):
             print("No serial port found.")
             return belt_controller
         if len(ports) == 1:
-            connect_ack = input("Connect using {}? [y,n]".format(ports[0][0]))
+            connect_ack = 'y'
             if connect_ack.lower() == "y" or connect_ack.lower() == "yes":
                 print("Connect the belt.")
                 belt_controller.connect(ports[0][0])

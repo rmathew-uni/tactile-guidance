@@ -68,7 +68,7 @@ def run(
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
-        classes_obj=67,  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
+        classes_obj=[22,47,46,67],  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
         classes_hand=[0,1],
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
@@ -124,6 +124,9 @@ def run(
     bbox_info = []  # Initialize a list to store bounding boxs
 
     horizontal_in, vertical_in = False, False
+    target_entered = False
+    target_obj = 00
+
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
@@ -261,7 +264,19 @@ def run(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
-        horizontal_out, vertical_out = navigate_hand(bbox_info,classes_obj,classes_hand,horizontal_in,vertical_in)
+        if target_entered == False:
+            target_obj = int(input('Enter the target object class #'))
+            target_entered = True
+            grasp = False
+            horizontal_in, horizontal_out = False, False
+            vertical_in, vertical_out = False, False
+        elif target_entered:
+            pass
+
+        horizontal_out, vertical_out, grasp = navigate_hand(bbox_info,target_obj,classes_hand,horizontal_in,vertical_in,grasp)
+
+        if horizontal_out and vertical_out and grasp:
+            target_entered = False
 
         #horizontal_in, vertical_in = False, False
 
@@ -273,9 +288,9 @@ def run(
         bbox_info = []
 
 
-def main(weights_obj, weights_hand, source, target_obj):
+def main(weights_obj, weights_hand, source):
     #check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    run(weights_obj=weights_obj, weights_hand= weights_hand, source=source, classes_obj=target_obj)
+    run(weights_obj=weights_obj, weights_hand= weights_hand, source=source)
 
 
 # if __name__ == '__main__':
