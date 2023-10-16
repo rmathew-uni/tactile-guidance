@@ -60,7 +60,7 @@ search_value_hand = "person"
 search_key_obj = "Label"
 search_value_obj = "tv"
 
-def navigate_hand(bbox_info, search_key_obj, search_value_obj, search_key_hand, search_value_hand, hor_correct = False, ver_correct = False):
+def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False, ver_correct = False):
     # Using a loop to find the index
     #index_hand = None
     #index_obj = None
@@ -85,10 +85,10 @@ def navigate_hand(bbox_info, search_key_obj, search_value_obj, search_key_hand, 
     bbox_hand, bbox_obj = None, None
 
     for bbox in bbox_info:
-        if bbox["label"] == search_key_hand and bbox["confidence"] > max_hand_confidence:
+        if bbox["class"] in search_key_hand and bbox["confidence"] > max_hand_confidence:
             bbox_hand = bbox.get("bbox")
             max_hand_confidence = bbox["confidence"]
-        elif bbox["label"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
+        elif bbox["class"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
             bbox_obj = bbox.get("bbox")
             max_obj_confidence = bbox["confidence"]
 
@@ -123,29 +123,30 @@ def navigate_hand(bbox_info, search_key_obj, search_value_obj, search_key_hand, 
 
 
     # This Will be adjusted if within if-loop
-    x_threshold = 10
-    y_threshold = 10
-    # Horizontal movement
-    if abs(x_center_hand - x_center_obj) > x_threshold:
-        if x_center_hand < x_center_obj:
-            # Here we use the script for bracelet
-            print('horiz')
-            belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
-        elif x_center_hand > x_center_obj:
-            print('horiz')
-            belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
-    else:
-        horizontal = True
+    x_threshold = 100
+    y_threshold = 100
 
     # Vertical movement
     if abs(y_center_hand - y_center_obj) > y_threshold:
         if y_center_hand < y_center_obj:
-            print('ver')
             belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+            print('down')
         elif y_center_hand > y_center_obj:
-            print('ver')
             belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+            print('up')
     else:
         vertical = True
+
+    # Horizontal movement
+    if abs(x_center_hand - x_center_obj) > x_threshold:
+        if x_center_hand < x_center_obj:
+            # Here we use the script for bracelet
+            print('right')
+            belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+        elif x_center_hand > x_center_obj:
+            print('left')
+            belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+    else:
+        horizontal = True
 
     return horizontal, vertical
