@@ -264,6 +264,8 @@ def run(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
+        # Hand navigation loop
+        # After passing target object class hand is navigated in each frame until grasping command is sent
         if target_entered == False:
             target_obj = int(input('Enter the target object class #'))
             target_entered = True
@@ -273,29 +275,32 @@ def run(
         elif target_entered:
             pass
 
-        horizontal_out, vertical_out, grasp = navigate_hand(bbox_info,target_obj,classes_hand,horizontal_in,vertical_in,grasp)
+        # Navigate the hand based on information from last frame and current frame detections
+        horizontal_out, vertical_out, grasp = navigate_hand(bbox_info, target_obj, classes_hand, horizontal_in, vertical_in, grasp)
 
+        # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if horizontal_out and vertical_out and grasp:
             target_entered = False
 
         #horizontal_in, vertical_in = False, False
 
+        # Set values of the inputs for the next loop iteration
         if horizontal_out:
            horizontal_in = True
         if vertical_out:
            vertical_in = True
 
+        # Clear bbox_info after applying navigation logic for the current frame
         bbox_info = []
 
 
 def main(weights_obj, weights_hand, source):
+    '''
+    Function that navigates hand toward target object based on input from object and hand detectors.
+    Input:
+    • weights_obj - weights for the object detector model
+    • weights_hand - weights for the hand detector model
+    • source - source of the visual data for which navigation will be applied; for default system camera type 0 or "0"
+    '''
     #check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     run(weights_obj=weights_obj, weights_hand= weights_hand, source=source)
-
-
-# if __name__ == '__main__':
-#     weights = 'yolov5s.pt'  # Model weights path
-#     source = '0'  # Input image path
-#     # Add other parameters as needed
-#
-#     main(weights, source)

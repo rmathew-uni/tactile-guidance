@@ -62,10 +62,21 @@ search_value_hand = "person"
 search_key_obj = "Label"
 search_value_obj = "tv"
 
-def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False, ver_correct = False, grasp=False):
-    # Using a loop to find the index
-    #index_hand = None
-    #index_obj = None
+def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False):
+    '''
+    Function that navigates the hand to the target object. Handles cases when either hand or target is not detected
+    Input:
+    • bbox_info - structure containing following information about each prediction: "class","label","confidence","bbox"
+    • search_key_obj - integer representing target object class
+    • search_key_hand - list of integers containing hand detection classes used for navigation
+    • hor_correct - boolean representing whether hand and object are assumed to be aligned horizontally; by default False
+    • ver_correct - boolean representing whether hand and object are assumed to be aligned vertically; by default False
+    • grasp - boolean representing whether grasp command has been sent; by default False
+    Output:
+    • horizontal - boolean representing whether hand and object are aligned horizontally after execution of the function; by default False
+    • vertical - boolean representing whether hand and object are aligned vertically after execution of the function; by default False
+    • grasp - boolean representing whether grasp command has been sent; by default False
+    '''
 
     horizontal, vertical = False, False
 
@@ -74,18 +85,9 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
 
     print(bbox_info)
 
-    # acquire the latest bbox information about hand and object
-    '''
-    for i, item in reversed(list(enumerate(bbox_info))):
-        if item.get(search_key_hand) == search_value_hand:
-            index_hand = i
-        elif item.get(search_key_obj) == search_value_obj:
-            index_obj = i
-            break
-    '''
-
     bbox_hand, bbox_obj = None, None
 
+    # Search for object and hand with the highest prediction confidence
     for bbox in bbox_info:
         if bbox["class"] in search_key_hand and bbox["confidence"] > max_hand_confidence:
             bbox_hand = bbox.get("bbox")
@@ -94,6 +96,8 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
             bbox_obj = bbox.get("bbox")
             max_obj_confidence = bbox["confidence"]
 
+    # Hand is detected, object is not detected, and they are aligned horizontally and vertically - send grasp command
+    # Assumption: occlusion of the object by hand
     if bbox_hand != None and bbox_obj == None and hor_correct and ver_correct:
 
         print("G R A S P !")
@@ -121,23 +125,22 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
 
         return True, True, grasp
 
+    # Neither hand nor object is detected - no navigation logic to apply
     if bbox_hand == None or bbox_obj == None:
         belt_controller.stop_vibration()
         print('no find')
-        return False, False, False
+        return False, False, grasp
 
-    #bbox_hand = bbox_info[index_hand].get("Bbox")
-    #bbox_obj = bbox_info[index_obj].get("Bbox")
-
+    # Getting horizontal and vertical position of the bounding box around target object and hand
     x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
     x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
 
-
-    # This Will be adjusted if within if-loop
+    # This will be adjusted if within if-loop
     x_threshold = 100
     y_threshold = 100
 
-    # Vertical movement
+    # Vertical movement logic
+    # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
     if abs(y_center_hand - y_center_obj) > y_threshold:
         if y_center_hand < y_center_obj:
             belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
@@ -148,10 +151,10 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
     else:
         vertical = True
 
-    # Horizontal movement
+    # Horizontal movement logic
+    # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
     if abs(x_center_hand - x_center_obj) > x_threshold:
         if x_center_hand < x_center_obj:
-            # Here we use the script for bracelet
             print('right')
             belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
         elif x_center_hand > x_center_obj:
@@ -160,4 +163,4 @@ def navigate_hand(bbox_info, search_key_obj, search_key_hand,hor_correct = False
     else:
         horizontal = True
 
-    return horizontal, vertical, False
+    return horizontal, vertical, grasp
