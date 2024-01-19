@@ -12,14 +12,6 @@
 # then these two are needed for always....
 
 # xywh --- xy is the center!
-# simple version of bounding boxes
-bbox_info = [{"Label": "person", "Bbox": [949.0, 527.5, 532.0, 379.0]},
-             {"Label": "tv", "Bbox": [581.5, 670.5, 229.0, 97.0]},
-             {"Label": "banana", "Bbox": [2.0, 527.5, 532.0, 379.0]},
-             {"Label": "tv", "Bbox": [948.0, 527.5, 532.0, 3.0]},
-             {"Label": "person", "Bbox": [800.0, 527.5, 532.0, 4.0]}
-             ]
-print(bbox_info)
 
 # find the index of person, and object
 # Define the key and value
@@ -72,7 +64,13 @@ def navigate_hand(bbox_info, search_key_obj, search_value_obj, search_key_hand, 
     #bbox_hand = bbox_info[index_hand].get("Bbox")
     #bbox_obj = bbox_info[index_obj].get("Bbox")
 
+    # get the original locations of the center of the bbox for the hand
     x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
+    
+    # designate a target point in the bbox that is on the fingers (moved up from the center of the box)
+    # the x center stays the same for this and we update the y coordinate of the center
+    #y_center_hand = bbox_hand[1]-(bbox_hand[3]/4)
+
     x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
 
 

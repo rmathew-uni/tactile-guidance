@@ -33,6 +33,7 @@ import os
 import platform
 import sys
 from pathlib import Path
+import keyboard
 
 import torch
 
@@ -51,6 +52,89 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 from bracelet import navigate_hand
 
+obj_name_dict = {
+0: "person",
+1: "bicycle",
+2: "car",
+3: "motorcycle",
+4: "airplane",
+5: "bus",
+6: "train",
+7: "truck",
+8: "boat",
+9: "traffic light",
+10: "fire hydrant",
+11: "stop sign",
+12: "parking meter",
+13: "bench",
+14: "bird",
+15: "cat",
+16: "dog",
+17: "horse",
+18: "sheep",
+19: "cow",
+20: "elephant",
+21: "bear",
+22: "zebra",
+23: "giraffe",
+24: "backpack",
+25: "umbrella",
+26: "handbag",
+27: "tie",
+28: "suitcase",
+29: "frisbee",
+30: "skis",
+31: "snowboard",
+32: "sports ball",
+33: "kite",
+34: "baseball bat",
+35: "baseball glove",
+36: "skateboard",
+37: "surfboard",
+38: "tennis racket",
+39: "bottle",
+40: "wine glass",
+41: "cup",
+42: "fork",
+43: "knife",
+44: "spoon",
+45: "bowl",
+46: "banana",
+47: "apple",
+48: "sandwich",
+49: "orange",
+50: "broccoli",
+51: "carrot",
+52: "hot dog",
+53: "pizza",
+54: "donut",
+55: "cake",
+56: "chair",
+57: "couch",
+58: "potted plant",
+59: "bed",
+60: "dining table",
+61: "toilet",
+62: "tv",
+63: "laptop",
+64: "mouse",
+65: "remote",
+66: "keyboard",
+67: "cell phone",
+68: "microwave",
+69: "oven",
+70: "toaster",
+71: "sink",
+72: "refrigerator",
+73: "book",
+74: "clock",
+75: "vase",
+76: "scissors",
+77: "teddy bear",
+78: "hair drier",
+79: "toothbrush"
+}
+
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
@@ -68,7 +152,7 @@ def run(
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
-        classes_obj=[22,47,46,67],  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
+        classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
         classes_hand=[0,1],
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
@@ -267,7 +351,15 @@ def run(
         # Hand navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
         if target_entered == False:
-            target_obj = int(input('Enter the target object class #'))
+            user_in = "n"
+            while user_in == "n":
+                print("These are the available objects:")
+                print(obj_name_dict)
+                target_obj_verb = input('Enter the object you want to target')
+                target_obj = [i for i, t in enumerate(obj_name_dict) if obj_name_dict[t]==f'{target_obj_verb}']
+                print(target_obj)
+                target_obj = target_obj[0]
+                user_in = input("Selected object is " + obj_name_dict[target_obj] + ". Correct? [y,n]")
             target_entered = True
             grasp = False
             horizontal_in, horizontal_out = False, False
