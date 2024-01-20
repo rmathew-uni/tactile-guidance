@@ -1,9 +1,13 @@
 ---
-title: "OptiVisT localization analysis"
+title: "OptiVisT localization task analysis"
 author: "Florian Pätzold, Ramon Zacharias"
 date: "2023-07-25"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
+
+# Setup
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -15,6 +19,8 @@ Import all necessary packages.
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(GGally)
+library(ggcorrplot)
 library(reshape2)
 library(plotly)
 ```
@@ -26,7 +32,8 @@ Set working directory, load all the localization data, clean it and combine it i
 ```{r}
 # Set working directory to the folder containing the CSV files
 HOME <- getwd()
-setwd(paste0(HOME, "/data"))
+SAVE <- paste0(getwd(), "/Plots/")
+setwd(paste0(HOME, "/../Data"))
 
 # Load combined grasping data
 grasping_data <- read.csv("combined.csv", header = TRUE, sep = ",")
@@ -35,7 +42,7 @@ grasping_data <- read.csv("combined.csv", header = TRUE, sep = ",")
 
 ```{r}
 # Create a list of file names that end with "_localization.csv"
-setwd(paste0(HOME, "/Data"))
+setwd(paste0(HOME, "/../Data"))
 file_list <- list.files(pattern = "_localization*")
 # Create an empty data frame to store the combined data
 localization_data <- data.frame()
@@ -88,9 +95,9 @@ localization_data <- localization_data[order(localization_data$participant_id), 
 #localization_data
 ```
 
-# Summary statistics
+# Summary statistics & visualization
 
-Mean accuracies.
+## Mean accuracies
 
 ```{r}
 # Mean accuracy all trials
@@ -172,11 +179,28 @@ ggplot(accuracy_last3, aes(x = as.factor(participant_id), y = accuracy, fill = c
   geom_bar(stat = "identity") +
   scale_fill_manual(values = c("red" = "#F8766D", "default" = "#545454")) +
   labs(title = "Mean accuracy in last 3 trials by participant", x = "Participant ID", y = "Mean accuracy in percent") +
-  coord_cartesian(ylim = c(85,100)) +
+  coord_cartesian(ylim = c(70,100)) +
   geom_hline(yintercept = 90, color = "red", linetype = "dashed") +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
   guides(fill = FALSE)
 ```
+```{r}
+# filter to combine plots
+filter <- accuracy_last3 %>% mutate(acc_first3 = accuracy_first3$accuracy, participant_id = as.factor(participant_id)) %>% select(participant_id, accuracy, acc_first3)
+
+# Create the barplot
+stacked_bar <- ggplot(filter, aes(x = participant_id, y = accuracy)) +
+  geom_col(stat = "identity", fill = "#F8766D") +
+  geom_col(aes(y = acc_first3), stat = "identity", color = "#545454", fill = "#545454", position = "stack") +
+  labs(title = "Mean accuracy by participant", x = "Participant ID", y = "Mean accuracy in %") +
+  geom_hline(yintercept = 90, color = "black", linetype = "dashed") +
+  coord_cartesian(ylim = c(70,100))
+stacked_bar
+
+#ggsave("stacked_barplot.jpeg", plot = stacked_bar, dpi = 600)
+```
+
+## Direction confusion
 
 Create a confusion matrix with counts and probabilities.
 
@@ -192,28 +216,34 @@ print(count_table)
 ```
 ```{r}
 # Convert the table into a data frame for ggplot2
-count_df <- as.data.frame(melt(count_table))
+ct_table <- count_table[, -5] # remove "no response"
+count_df <- as.data.frame(melt(ct_table))
 
 # Convert Var1 and Var2 to character
 count_df$Var1 <- as.character(count_df$Var1)
 count_df$Var2 <- as.character(count_df$Var2)
 
-# Reorder the factor levels in Var2
-count_df$Var2 <- factor(count_df$Var2, levels = c("down", "left", "right", "up", "no response"))
+# Reorder the factor levels in Var1 and 2
+count_df$Var1 <- factor(count_df$Var1, levels = c("left", "down", "right", "up", "no response"))
+count_df$Var2 <- factor(count_df$Var2, levels = c("left", "down", "right", "up", "no response"))
 
 # Add a new column specifying whether or not each cell is on the diagonal
 # Exclude "no response" column from the diagonal
-count_df$on_diagonal <- count_df$Var1 == count_df$Var2 & count_df$Var2 != "no response"
+count_df$on_diagonal <- count_df$Var1 == count_df$Var2 & count_df$Var1 != "no response" & count_df$Var2 != "no response"
+count_df <- count_df %>% rename(count = value)
 
 # Create the plot
-ggplot(count_df, aes(Var2, Var1, fill = on_diagonal)) +
-  geom_tile(aes(fill = on_diagonal)) +
-  scale_fill_manual(values = c("steelblue", "orange"), guide = FALSE) +
-  geom_text(aes(label = round(value, 3)), size = 4) +
+confusion_counts <- ggplot(count_df, aes(Var2, Var1, fill = count)) +
+  geom_tile() +
+  scale_fill_gradient(low = "steelblue", high = "orange") +
+  geom_text(aes(label = round(count, 3)), size = 4) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "Predicted", y = "Actual") +
-  ggtitle("Confusion Matrix (counts)")
+  labs(x = "Response", y = "Direction command") #+
+  #ggtitle("Count of vibration signal misinterpretation")
+confusion_counts
+
+#ggsave(paste0(SAVE,"confusion_counts.jpeg"), plot = confusion_counts, dpi = 600)
 ```
 
 ```{r}
@@ -236,7 +266,7 @@ Now for probabilities.
 
 ```{r}
 # Create a confusion matrix by dividing the count table by the row sums
-confusion_matrix <- prop.table(count_table, 1) * 100
+confusion_matrix <- prop.table(count_table, 1)
 
 # Print the result
 confusion_matrix
@@ -257,15 +287,12 @@ confusion_df$Var2 <- factor(confusion_df$Var2, levels = c("down", "left", "right
 # Exclude "no response" column from the diagonal
 confusion_df$on_diagonal <- confusion_df$Var1 == confusion_df$Var2 & confusion_df$Var2 != "no response"
 
-# Create the heatmap
-ggplot(confusion_df, aes(Var2, Var1, fill = on_diagonal)) +
-  geom_tile(aes(fill = on_diagonal)) +
-  scale_fill_manual(values = c("steelblue", "orange"), guide = FALSE) +
-  geom_text(aes(label = round(value, 3)), size = 4) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "Predicted", y = "Actual") +
-  ggtitle("Confusion Matrix (percentages)")
+# create heatmap with ggcorrplot
+confusion_mat <- confusion_matrix[, -5] # remove "no response"
+confusions <- ggcorrplot(confusion_mat, lab=TRUE, digits=4, colors=c("#6D9EC1", "white", "#E46726"))
+confusions
+
+#ggsave(paste0(SAVE,"confusion_mat_cc.jpeg"), plot = confusions, dpi = 600)
 ```
 
 ```{r}
@@ -283,7 +310,9 @@ left <- confusion_matrix["left", "left"]
 cat(sprintf("Up and Right got confused ~%.2f%% of the time. \nUp and Down got confused ~%.2f%% of the time. \nUp and Left got confused ~%.2f%% of the time. \nRight and Down got confused ~%.2f%% of the time. \nRight and Left got confused ~%.2f%% of the time. \nDown and Left got confused ~%.2f%% of the time. \nIn ~%.2f%% of trials the participant answered with no response. \nThe Right vibration motor was identified with the highest accuracy of ~%.2f%%. \nOverall participants identified the Left motor with the lowest acccuracy of ~%.2f%%.", up_right, up_down, up_left, right_down, right_left, down_left, noresponse, right, left))
 ```
 
-Connecting localization and grasping performances.
+## Predicting grasping performance with localization performance
+
+### Reaction times
 
 ```{r}
 # filter for only successes in tactile condition
@@ -336,6 +365,15 @@ mixed_data %>% group_by(acc_last3) %>% summarize(mean_time = mean(mean_time)) %>
   scale_x_continuous(breaks = round(mixed_data$acc_last3, 1)) +
   scale_y_continuous(breaks = scales::pretty_breaks())
 ```
+```{r}
+# test for task performance correlation
+cor.test(mixed_data$mean_time, mixed_data$acc_last3)
+```
+
+
+**Interpretation:** positive correlation means more fails mean slower trials -> probably because people that have trouble interpreting tactile signals also go slower, but still fail more.
+
+### Fails
 
 ```{r}
 # have a look at the errors per accuracy
@@ -382,6 +420,27 @@ mixed_data %>% group_by(acc_last3) %>% summarize(mean_fails = mean(fails)) %>%
   scale_x_continuous(breaks = round(mixed_data$acc_last3, 1)) +
   scale_y_continuous(breaks = scales::pretty_breaks())
 ```
+
+Let's test the correlation again between grasping accuracy and localization accuracy / mean trial times.
+
+```{r}
+# calc acc exclude experimenter fails
+# have a look at the errors per accuracy
+total_trials <- grasping_data %>% 
+  select(-1) %>% 
+  filter(success!="exFail", condition=="tactile") %>% 
+  group_by(participant_id) %>% 
+  count() %>% 
+  rename_at('n', ~'trial_count')
+
+# add to mixed data
+mixed_data$grasp_acc <- 1 - (mixed_data$fails / total_trials$trial_count)
+
+# correlation testing
+cor.test(mixed_data$grasp_acc, mixed_data$acc_last3)
+#cor.test(mixed_data$grasp_acc, mixed_data$mean_time)
+```
+
 
 ```{r}
 # idea: create a scatterplot in 3D to observe correlation between errors in both tasks in form of clusters -- if participants failed in correctly identifying "left" direction in the localization task, do they also make more mistakes regarding position 4 in the grasping task?
@@ -454,6 +513,7 @@ coeffs %>%
 
 cor(cluster_data$grasping_errors, cluster_data$localization_errors)
 ```
+
 Interpretation: The plot shows that the errors made in both tasks seem to be unrelated. The correlation between both error types is -0.308, slightly negatively correlated, which means that for errors made in one task the error count in the other task is going into the other direction. This might mean that participants in the localization task efficiently learned to identify vibration directions (0 was swapped with -1 values for calculation, so overall negative correlation values mean overall low error counts).
 
 ```{r}

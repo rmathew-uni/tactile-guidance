@@ -1,9 +1,13 @@
 ---
-title: "OptiVisT grasping analysis"
+title: "OptiVisT grasping task analysis"
 author: "Florian Pätzold, Ramon Zacharias"
 date: "3/21/2023"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
+
+# Setup
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -13,7 +17,10 @@ Import all necessary packages.
 
 ```{r}
 library(dplyr)
+library(tidyr)
 library(ggplot2)
+library(sjPlot)
+library(gridExtra)
 library(EnvStats)
 library(outliers)
 library(lme4)
@@ -22,11 +29,12 @@ library(lmerTest) # significance testing for linear mixed models
 
 # Data preprocessing
 
-Set working directory, load all the grasping data, clean it and combine it into one dataframe.
+Set working directory, load all the grasping data, clean it and combine it into one data frame.
 
 ```{r}
 # Set working directory to the folder containing the CSV files
-setwd("data")
+SAVE <- paste0(getwd(), "/Plots/")
+setwd("../Data")
 # Get list of all CSV files for the grapsing task in the folder
 file_list <- list.files(getwd(), pattern = "*grasping*")
 # Delete testing data file
@@ -77,11 +85,13 @@ row.names(combined_data) <- NULL
 write.csv(combined_data, "combined.csv")
 ```
 
-### Outlier detection
+## Outlier detection
 
 ```{r}
 # first block in each condition is training block
 clean_data <- combined_data %>% filter(block != 1)
+clean_data$num_instructions <- ifelse(clean_data$location %in% c(5), 1, 
+                                      ifelse(clean_data$location %in% c(2, 4, 6, 8), 2, 3))
 
 # Grubbs' test by condition
 grubbs_results <- by(clean_data$time, clean_data$condition, grubbs.test)
@@ -90,7 +100,7 @@ print(grubbs_results)
 # clean_data <- clean_data %>% filter(time < 10.0)
 ```
 
-### Normality assumption check
+## Normality assumption check
 
 ```{r}
 # Split the data by condition and drop fails
@@ -110,6 +120,25 @@ hist(tactile_data$time, main="Histogram of Tactile Times", xlab="Times")
 qqnorm(tactile_data$time, main="Normal Probability Plot of Tactile Times")
 qqline(tactile_data$time)
 
+# normal distribution
+x <- seq(min(log(tactile_data$time)), max(log(tactile_data$time)), length.out = length(tactile_data$time))
+y <- dnorm(x, mean = mean(log(tactile_data$time)), sd = sd(log(tactile_data$time)))
+t_normal <- data.frame(x = x, y = y)
+
+x <- seq(min(log(auditory_data$time)), max(log(auditory_data$time)), length.out = length(auditory_data$time))
+y <- dnorm(x, mean = mean(log(auditory_data$time)), sd = sd(log(auditory_data$time)))
+a_normal <- data.frame(x = x, y = y)
+
+# plot density comparisons for t and a (justification for parametric LMM)
+ggplot(tactile_data) + 
+  geom_density(aes(x = log(time)), fill = "red", alpha = 0.5) +
+  geom_line(aes(x = t_normal$x, y = t_normal$y), size = 0.7, color = "darkgreen")
+
+ggplot(auditory_data) + 
+  geom_density(aes(x = log(time)), fill = "red", alpha = 0.5) +
+  geom_line(aes(x = a_normal$x, y = a_normal$y), size = 0.7, color = "darkgreen")
+```
+```{r, eval=FALSE, include=FALSE}
 # Perform Shapiro-Wilk test for normality for each condition
 shapiro.test(auditory_data$time)
 shapiro.test(tactile_data$time)
@@ -119,17 +148,102 @@ ks.test(auditory_data$time, "pnorm", mean(auditory_data$time), sd(auditory_data$
 ks.test(tactile_data$time, "pnorm", mean(tactile_data$time), sd(tactile_data$time))
 ```
 
-The Shapiro-Wilk test (a,t: \*\*\*) suggests that the data was generated from a non-normal distribution --> we use non-parametric hypothesis tests --> Wilcoxon rank sum to compare unpaired data medians.
+Looks multi-modal because of different number of instructions.
 
-# Data visualiation and hypothesis testing
+```{r}
+# Assumption: tri-modality of the data for different number of commands
+aud_1 <- clean_data %>% filter(condition == "auditory", success == "success", num_instructions == 1)
+aud_2 <- clean_data %>% filter(condition == "auditory", success == "success", num_instructions == 2)
+aud_3 <- clean_data %>% filter(condition == "auditory", success == "success", num_instructions == 3)
+
+tac_1 <- clean_data %>% filter(condition == "tactile", success == "success", num_instructions == 1)
+tac_2 <- clean_data %>% filter(condition == "tactile", success == "success", num_instructions == 2)
+tac_3 <- clean_data %>% filter(condition == "tactile", success == "success", num_instructions == 3)
+
+# plot density comparisons filtered by number of commands
+compare_to_normal <- function(data) {
+  x <- seq(min(data$time), max(data$time), length.out = length(data$time))
+  y <- dnorm(x, mean = mean(data$time), sd = sd(data$time))
+  t_normal <- data.frame(x = x, y = y)
+  
+  p <- ggplot(data) + 
+    geom_density(aes(x = time), fill = "red", alpha = 0.5) +
+    geom_line(aes(x = t_normal$x, y = t_normal$y), size = 0.7, color = "darkgreen") +
+    ggtitle(sprintf("data: %s", deparse(substitute(data))))
+  
+  return(p)
+}
+
+aud1 <- compare_to_normal(aud_1)
+aud2 <- compare_to_normal(aud_2)
+aud3 <- compare_to_normal(aud_3)
+
+tac1 <- compare_to_normal(tac_1)
+tac2 <- compare_to_normal(tac_2)
+tac3 <- compare_to_normal(tac_3)
+
+grid.arrange(aud1,aud2,aud3,tac1,tac2,tac3, ncol = 3)
+
+#ggsave(paste0(SAVE,"normality.jpeg"), plot = grid, dpi = 600)
+```
+```{r, eval=FALSE, include=FALSE}
+# Statistical test
+shapiro.test(log(aud_1$time))
+shapiro.test(log(aud_2$time))
+shapiro.test(log(aud_3$time))
+
+shapiro.test(log(tac_1$time))
+shapiro.test(log(tac_2$time))
+shapiro.test(log(tac_3$time))
+```
+
+Statistical tests suggest non-normality, visually they are normally distributed. The t-test and Wilcoxon rank sum test yield the same results in all comparisons, so we go with the student's t-test and assume that the data stems from a normal distribution.
+
+# Data visualisation and hypothesis testing
 
 Calculate summary statistics, visualize aspects of the data and test the corresponding hypotheses.
+
+## Trial times per participant
+
+```{r}
+# time standard devs
+clean_data %>% group_by(condition) %>% summarize(mean = mean(time), sd = sd(time))
+combined_data %>% group_by(condition, block) %>% summarize(mean = mean(time), sd = sd(time))
+```
+
+
+```{r}
+times_per_participant <- clean_data %>% 
+  filter(success == "success") %>% 
+  group_by(participant_id, condition) %>% 
+  summarize(mean_time = mean(time) * 1000) %>% 
+  spread(condition, mean_time) %>% 
+  mutate(diff = tactile - auditory, color = ifelse(diff > 0, "#00BFC4", "#F8766D")) %>% 
+  ggplot(aes(x = factor(participant_id), y = diff, fill = color)) +
+  geom_bar(stat = "identity", position = "identity") +
+  labs(
+    #title = "Mean trial time difference between conditions per participant",
+    x = "\n Participant",
+    y = "Trial time difference (ms) \n") +
+  theme_linedraw() +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "right") +
+  scale_fill_manual(name=NULL, values = c("#00BFC4", "#F8766D"), labels = c("Tactile > Auditory", "Auditory > Tactile"))
+
+times_per_participant
+#ggsave(paste0(SAVE,"times_per_participant.jpeg"), plot = times_per_participant, dpi = 600)
+```
 
 ```{r}
 # Barplot: Mean trial times for each condition per participant
 clean_data %>% filter(success == "success") %>% group_by(participant_id, condition) %>% summarize(mean_time = mean(time)*1000)
-clean_data %>% filter(success == "success") %>% group_by(participant_id, condition) %>% summarize(mean_time = mean(time)*1000) %>% 
-ggplot(aes(x = factor(participant_id), y = mean_time, fill = condition)) +
+times_per_participant <- clean_data %>% 
+  filter(success == "success") %>% 
+  group_by(participant_id, condition) %>% 
+  summarize(mean_time = mean(time)*1000) %>% 
+  ggplot(aes(x = factor(participant_id), y = mean_time, fill = condition)) +
   geom_bar(stat = "identity", position = "dodge") +
   labs(
     title = "Mean trial times for each participant per condition", 
@@ -141,110 +255,77 @@ ggplot(aes(x = factor(participant_id), y = mean_time, fill = condition)) +
   theme(plot.title = element_text(face = "bold", hjust = 0.5), 
     plot.subtitle = element_text(hjust = 0.5),
     legend.position = "right")
+
+times_per_participant
+#ggsave(paste0(SAVE,"times_per_participant.jpeg"), plot = times_per_participant, dpi = 600)
 ```
 
-```{r}
-# Bar plot: x = fail, exfail (grouped by condition), y = counts
-clean_data %>% group_by(condition, success) %>% count() %>% filter(success != "success")
-clean_data %>% group_by(condition, success) %>% count() %>% filter(success != "success") %>%
-  ggplot(aes(x = condition, y = n, fill = success)) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_text(aes(label = n), position = position_dodge(width = 1), vjust = 2, hjust=0.5) +
-  scale_y_continuous(breaks = scales::pretty_breaks()) +
-  labs(
-    title = "Count of trials with false instruction or response", 
-    x = NULL, 
-    y = "Count \n",
-    subtitle = "in auditory and tactile condition \n"
-    ) +
-  theme_linedraw() + 
-  theme(plot.title = element_text(face = "bold", hjust = 0.5), 
-    plot.subtitle = element_text(hjust = 0.5),
-    legend.position = "right", legend.title = element_blank()) +
-  scale_fill_discrete(labels = c("experimenter fail", "participant fail"))
-```
+## Trial times per condition
 
 ```{r}
-# Line plot: x = block (grouped by condition --> 2 lines), y = fail counts
-clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail"))
-clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail")) %>% 
-  ggplot(aes(x = block, y = fail_count, color=condition)) +
-  geom_point() +
-  geom_line() +
-  labs(
-    title = "Count of trials with false response per block by condition", 
-    x = "\n Block number", 
-    y = "Fail count \n"
-    ) +
-  theme_linedraw() + 
-  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
-  scale_x_continuous(breaks = c(1:8))
-```
-
-```{r}
-# Density plot: x = time, y = probability density (grouped by condition)
-clean_data %>% group_by(condition) %>% filter(success == "success") %>% 
-  ggplot(aes(x = log(time*1000), color=condition, fill=condition)) +
-  geom_density(alpha=0.5) +
-  labs(
-    title = "Density of log-transformed trial times by condition", 
-    x = "\n Trial time (log(ms))", 
-    y = "\n"
-    ) +
-  theme_linedraw() + 
-  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank())
-```
-
-```{r}
-# Box plot: x = condition, y = RT
+# Violin plot: x = condition, y = RT
 clean_data %>% group_by(condition) %>% filter(success == "success") %>% summarize(mean_time = mean(time)*1000)
-clean_data %>% filter(success == "success") %>%
-  ggplot(aes(x = condition, y = time*1000)) +
-  geom_boxplot(outlier.shape = NA) +
+times_condition_violin <- clean_data %>% filter(success == "success") %>%
+  ggplot(aes(x = condition, y = time*1000, color=condition)) +
+  geom_violin(width=0.5) +
+  geom_boxplot(outlier.shape = NA, width=0.1) +
   labs(
-    title = "Mean and 25% and 75% trial time quantiles per condition", 
+    #title = "Distribution of trial times per condition", 
     x = NULL, 
     y = "Trial time (ms) \n"
     ) +
   theme_linedraw() + 
   theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
-  scale_y_continuous(limits = c(0, 6000)) # remove outliers from plot
+  scale_y_continuous(limits = c(0, 6000)) +# remove outliers from plot
+  guides(color = FALSE)
+
+times_condition_violin
+#ggsave(paste0(SAVE,"times_condition_violin.jpeg"), plot = times_condition_violin, dpi = 600)
   
 
-# Perform the non-parametric Wilcoxon rank sum (with unpaired data as fail trials are excluded) test to compare group medians.
-# Compare the results to the results of the corresponding t-tests (group mean comparison for normally distributed data).
-wilcox.test(auditory_data$time, tactile_data$time, paired = FALSE)
+# Perform t-test (with unpaired data as fail trials are excluded) test to compare group means
 t.test(auditory_data$time, tactile_data$time, paired = FALSE)
 ```
 
 ```{r}
+learning_data <- combined_data %>% filter(success == "success")
+
 # Line plot: x = block (grouped by condition --> 2 lines), y = median/mean RT
-combined_data %>% group_by(block, condition) %>% summarize(mean_time = mean(time)*1000)
-combined_data %>% group_by(block, condition) %>% summarize(mean_time = mean(time)*1000) %>% 
+learning_data %>% group_by(block, condition) %>% summarize(mean_time = mean(time)*1000)
+times_per_block <- learning_data %>% group_by(block, condition) %>% summarize(mean_time = mean(time)*1000) %>% 
   ggplot(aes(x = block, y = mean_time, color=condition)) +
   geom_point() +
   geom_line() +
   labs(
-    title = "Mean trial times per block by condition", 
+    #title = "Mean trial times per block by condition", 
     x = "\n Block number", 
     y = "Mean trial times (ms) \n"
     ) +
   theme_linedraw() + 
   theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
-  scale_x_continuous(breaks = c(1:8))
+  scale_x_continuous(breaks = c(1:8)) #+
+  #scale_y_continuous(limits = c(2000, 6000))
+
+times_per_block
+#ggsave(paste0(SAVE,"times_per_block.jpeg"), plot = times_per_block, dpi = 600)
 
 # test diffs between blocks
 # tactile
-wilcox.test(filter(combined_data, block == 1, condition == "tactile")$time, 
-            filter(combined_data, block == 2, condition == "tactile")$time, paired = FALSE) # ***
-wilcox.test(filter(combined_data, block == 3, condition == "tactile")$time, 
-            filter(combined_data, block == 4, condition == "tactile")$time, paired = FALSE) # *
+t.test(filter(learning_data, block == 1, condition == "tactile")$time, 
+            filter(learning_data, block == 2, condition == "tactile")$time, paired = FALSE) # ***
+t.test(filter(learning_data, block == 3, condition == "tactile")$time, 
+            filter(learning_data, block == 4, condition == "tactile")$time, paired = FALSE) # *
 
 # auditory
-wilcox.test(filter(combined_data, block == 1, condition == "auditory")$time, 
-            filter(combined_data, block == 2, condition == "auditory")$time, paired = FALSE) # ***
+t.test(filter(learning_data, block == 1, condition == "auditory")$time, 
+            filter(learning_data, block == 2, condition == "auditory")$time, paired = FALSE) # ***
 
 # other comparisons yielded no significant differences
+t.test(filter(learning_data, block == 4, condition == "auditory")$time, 
+            filter(learning_data, block == 5, condition == "auditory")$time, paired = FALSE)
+
+t.test(filter(learning_data, block == 4, condition == "tactile")$time, 
+            filter(learning_data, block == 5, condition == "tactile")$time, paired = FALSE)
 ```
 
 ```{r}
@@ -301,7 +382,11 @@ data_tfirst <- clean_data[clean_data$participant_id == 2
                              | clean_data$participant_id == 26 
                              | clean_data$participant_id == 27 
                              | clean_data$participant_id == 29, ]
-data_tfirst$order <- "tactile_auditory"
+
+
+if (length(data_tfirst != 0)) {
+  data_tfirst$order <- "tactile_auditory"
+}
 
 data_afirst <- clean_data[clean_data$participant_id == 1 
                              | clean_data$participant_id == 4 
@@ -318,7 +403,11 @@ data_afirst <- clean_data[clean_data$participant_id == 1
                              | clean_data$participant_id == 25 
                              | clean_data$participant_id == 28 
                              | clean_data$participant_id == 30, ]
-data_afirst$order <- "auditory_tactile"
+
+
+if (length(data_afirst != 0)) {
+  data_afirst$order <- "auditory_tactile"
+}
 
 # bind the order data
 order_data <- rbind(data_tfirst, data_afirst)
@@ -343,9 +432,70 @@ tactile_tfirst <- order_data %>% filter(success == "success", condition == "tact
 tactile_afirst <- order_data %>% filter(success == "success", condition == "tactile", order == "auditory_tactile")
 auditory_tfirst <- order_data %>% filter(success == "success", condition == "auditory", order == "tactile_auditory")
 auditory_afirst <- order_data %>% filter(success == "success", condition == "auditory", order == "auditory_tactile")
-wilcox.test(tactile_tfirst$time, tactile_afirst$time, paired = FALSE) # ***
-wilcox.test(auditory_tfirst$time, auditory_afirst$time, paired = FALSE) # **
+
+t.test(tactile_tfirst$time, tactile_afirst$time, paired = FALSE) # ***
+t.test(auditory_tfirst$time, auditory_afirst$time, paired = FALSE)
 ```
+## Fails by condition
+
+```{r}
+# Bar plot: x = fail, exfail (grouped by condition), y = counts
+clean_data %>% group_by(condition, success) %>% count() %>% filter(success != "success")
+clean_data %>% group_by(condition, success) %>% count() %>% filter(success != "success") %>%
+  ggplot(aes(x = condition, y = n, fill = success)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_text(aes(label = n), position = position_dodge(width = 1), vjust = 2, hjust=0.5) +
+  scale_y_continuous(breaks = scales::pretty_breaks()) +
+  labs(
+    title = "Count of trials with false instruction or response", 
+    x = NULL, 
+    y = "Count \n",
+    subtitle = "in auditory and tactile condition \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold", hjust = 0.5), 
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.position = "right", legend.title = element_blank()) +
+  scale_fill_discrete(labels = c("experimenter fail", "participant fail"))
+```
+
+```{r}
+# Line plot: x = block (grouped by condition --> 2 lines), y = fail counts
+clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail"), exFail_count = sum(success == "exFail"))
+fails_per_block <- clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail"), exFail_count = sum(success == "exFail")) %>% 
+  ggplot(aes(x = block, y = fail_count, color=condition)) +
+  geom_point(aes(y = fail_count, shape="Group 1"), size=3) +
+  geom_line(aes(y = fail_count)) +
+  geom_point(aes(y = exFail_count, shape="Group 2"), size=3) +
+  geom_line(aes(y = exFail_count)) +
+  labs(
+    #title = "Count of trials with false response or instruction per block by condition", 
+    x = "\n Block number", 
+    y = "Fail count \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
+  scale_x_continuous(breaks = c(1:8)) +
+  scale_shape_manual(
+    name = "Fail type",
+    values = c("Group 1" = 16, "Group 2" = 5),  # Use 16 for a solid point
+    labels = c("Participant fails", "Experimenter fails"))
+
+fails_per_block
+#ggsave(paste0(SAVE,"fails_per_block.jpeg"), plot = fails_per_block, dpi = 600)
+
+# test for significance
+fails_a <- clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail")) %>% filter(condition=="auditory")
+fails_t <- clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail")) %>% filter(condition=="tactile")
+
+t.test(fails_a$fail_count, fails_t$fail_count)
+
+fails_time <- clean_data %>% group_by(block, condition) %>% summarize(fail_count = sum(success == "fail"), mean_time = mean(time)) %>% filter(condition=="tactile")
+cor.test(fails_time$mean_time, fails_time$fail_count)
+```
+
+
+## Fails per experimenter
 
 ```{r}
 # Subset data by experimenter
@@ -421,7 +571,10 @@ experimenter_data %>% group_by(experimenter, success) %>% count() %>% filter(suc
     legend.position = "right", legend.title = element_blank()) + # legend.title = element_blank()
   scale_fill_discrete(labels = c("experimenter fail", "participant fail"))
 ```
-# Bind data for LMM
+
+# Linear Mixed-Effects Model (LMM)
+
+## Data preparation
 
 ```{r}
 grasping_data <- clean_data %>% filter(success == "success") %>% select(-success)
@@ -453,23 +606,24 @@ grasping_data$block <- as.character(grasping_data$block) # numeric to character 
 grasping_data$num_instructions <- as.character(grasping_data$num_instructions)
 ```
 
-# Exploration
+## Model comparison & selection
 
 In order to decide which variables are included in the LMM and which are excluded, we evaluate models, compare them, test for significant effects and investigate their complexity in terms of number of coefficients/parameters.
 
-- LMM Tutorial: https://www.youtube.com/watch?v=QCqF-2E86r0 !!!
-- Interpretation explanation: https://www.youtube.com/watch?v=yJnHmCMb1q4
-- An LMM example (interaction explanation): https://www.youtube.com/watch?v=W8txfclM16U
-
-Decision train of thought:
-- variables: num_instructions, location, block, condition, pID, order, experimenter
-- fixed effects we are interested in: condition (difference between sensory modalities), block (learning effects)
-- num_instructions and location correlate (num is inferable from loc) and location gives a little more exact information (not only instructions = 2, but also whether top-left, top-right or bottom-left, bottom-right) but makes the model drastically more complex --> we would choose num_instructions as fixed --> we are not interested in it so we exclude
-- crossed random effects: order and experimenter as some participants did have the order tactile_first, but not the other order, or did the experiment with "f" as first experimenter and not with the other, i.e. random effect 'order' occurs in each of the levels of random effect 'experimenter'
-- we also model varying condition slopes of both random effects but not block slopes as the blocks in principle have the same structure, while the conditions are inherently different
+**Decision train of thought:**
+- variables: num_instructions, location, block, condition, pID, order, experimenter  
+- fixed effects we are interested in: condition (difference between sensory modalities), block (learning effects)  
+- num_instructions and location correlate (num is inferable from loc) and location gives a little more exact information (not only instructions = 2, but also whether top-left, top-right or bottom-left, bottom-right) but makes the model drastically more complex --> we would choose num_instructions as fixed --> we are not interested in it so we exclude  
+- crossed random effects: order and experimenter as some participants did have the order tactile_first, but not the other order, or did the experiment with "f" as first experimenter and not with the other, i.e. random effect 'order' occurs in each of the levels of random effect 'experimenter'  
+- we also model varying condition slopes of both random effects but not block slopes as the blocks in principle have the same structure, while the conditions are inherently different  
 - usually random effects should have at least 5 levels, but I want to include them  
-- in theory participantID could also be seen as random effect, but I think this is the variation we want to investigate in science -> check for interaction effects (correlations?) between variables and leave out variables without significant effect 
-- (model comparison: anova with model h0 with additional variable, h1 without additional var) --> can be replaced by lmerTest package anova testing
+- in theory participantID could also be seen as random effect, but I think this is the variation we want to investigate in science -> check for interaction effects (correlations?) between variables and leave out variables without significant effect  
+- (model comparison: anova with model h0 with additional variable, h1 without additional var) --> can be replaced by lmerTest package anova testing  
+
+**Resources:**
+- LMM Tutorial: https://www.youtube.com/watch?v=QCqF-2E86r0 !!!  
+- Interpretation explanation: https://www.youtube.com/watch?v=yJnHmCMb1q4  
+- An LMM example (interaction explanation): https://www.youtube.com/watch?v=W8txfclM16U 
 
 ```{r}
 # model testing: decide which variables to include/exclude (with lmerTest)
@@ -526,7 +680,7 @@ model_alt2 <- lmer(time ~
               data = grasping_data)
 summary(model_alt2)
 ```
-# Final LMM
+## Final LMM
 
 ```{r}
 model <- lmer(time ~
@@ -536,23 +690,82 @@ model <- lmer(time ~
                 (condition | experimenter), 
               data = grasping_data)
 
-# anova(model) # --> no significant difference in trial times between conditions in this model
-# coef(model) #
-summary(model) 
-# "boundary (singular) fit: see ?isSingular" --> model too complex, cannot converge -> leave out block?
-# without 'block' it gives the same warning --> include
+summary(model)
+#anova(model) # --> no significant difference in trial times between conditions in this model
 ```
-
 Random effects cannot be plotted against time since experimenter, order (and block) are all discrete.
 
-# Model diagnostics
+### LMM Visualizations
 
 ```{r}
-# 1. plot residuals vs. fitted for entire model & vs. each independent var -> should show no trends, normally distributed, equal variance
+grasping_data$block <- as.double(grasping_data$block)
 
-# 2. plot residuals vs. fitted for each random effect --> should show no trends, normally distributed, equal variance
+# change label names
+labels <- c(`1` = "Experimenter 1",
+            `2` = "Experimenter 2",
+            `3` = "Experimenter 3",
+            `auditory_first` = "Auditory First",
+            `tactile_first` = "Tactile First")
 
-# 3. conditional mean of random effects should be normally distributed (normal QQ-plot)
+lmm_plot <- grasping_data %>% group_by(block, condition, experimenter, order) %>% summarize(mean_time = mean(time)) %>% 
+  ggplot(aes(x = block, y = mean_time, color=condition)) +
+  geom_point() +
+  geom_line() +
+  labs(
+    title = "Mean trial times per block by condition", 
+    x = "\n Block number", 
+    y = "Mean trial times (ms) \n"
+    ) +
+  theme_linedraw() + 
+  theme(plot.title = element_text(face = "bold"), legend.position = "right", legend.title = element_blank()) +
+  scale_x_continuous(breaks = c(2:8)) +
+  scale_y_continuous(limits = c(2000, 4000)) +
+  facet_grid(experimenter ~ order, 
+             labeller = as_labeller(labels))
+lmm_plot
+
+#ggsave(paste0(SAVE,"lmm_plot.jpeg"), plot = lmm_plot, dpi = 600)
 ```
 
+```{r}
+exp <- ranef(model)$experimenter
+ord <- ranef(model)$order
+
+mean_aud <- grasping_data %>% filter(condition == "auditory") %>% summarize(mean = mean(time))
+mean_tac <- grasping_data %>% filter(condition == "tactile") %>% summarize(mean = mean(time))
+
+colors <- c("Experimenter 1"="#f04546","Experimenter 2"="#3591d1","Experimenter 3"="#62c76b", "Auditory First" = "orange", "Tactile First" = "purple")
+linetypes <- c("Experimenter 1"="solid","Experimenter 2"="solid","Experimenter 3"="solid", "Auditory First"="dotted", "Tactile First"="dotted")
+legend_order <- c("Experimenter 1", "Experimenter 2", "Experimenter 3", "Auditory First", "Tactile First")
+
+lmm_ranef <- grasping_data %>% ggplot(aes(x = condition, y = time)) +
+  geom_point(position = position_jitter(width=0.2), alpha=0.2) +
+  geom_segment(aes(x = "auditory", xend = "tactile", 
+                   y = exp$`(Intercept)`[1] + mean_aud$mean, 
+                   yend = exp$`(Intercept)`[1] + mean_tac$mean + exp$conditiontactile[1], color = "Experimenter 1", linetype = "Experimenter 1"), linewidth = 1) +
+  geom_segment(aes(x = "auditory", xend = "tactile", 
+                   y = exp$`(Intercept)`[2] + mean_aud$mean, 
+                   yend = exp$`(Intercept)`[2] + mean_tac$mean + exp$conditiontactile[2], color = "Experimenter 2", linetype = "Experimenter 2"), linewidth = 1) +
+  geom_segment(aes(x = "auditory", xend = "tactile", 
+                   y = exp$`(Intercept)`[3] + mean_aud$mean, 
+                   yend = exp$`(Intercept)`[3] + mean_tac$mean + exp$conditiontactile[3], color = "Experimenter 3", linetype = "Experimenter 3"), linewidth = 1) +
+  geom_segment(aes(x = "auditory", xend = "tactile", 
+                   y = ord$`(Intercept)`[1] + mean_aud$mean, 
+                   yend = ord$`(Intercept)`[1] + mean_tac$mean + ord$conditiontactile[1], color = "Auditory First", linetype = "Auditory First"), linewidth = 1) +
+  geom_segment(aes(x = "auditory", xend = "tactile", 
+                   y = ord$`(Intercept)`[2] + mean_aud$mean, 
+                   yend = ord$`(Intercept)`[2] + mean_tac$mean + ord$conditiontactile[2], color = "Tactile First", linetype = "Tactile First"), linewidth = 1) +
+  scale_color_manual(name = NULL, values = colors, breaks = legend_order) +
+  scale_linetype_manual(name = NULL, values = linetypes, breaks = legend_order) +
+  labs(
+    #title = "Random effects experimenter and order on trial times", 
+    x = NULL, 
+    y = "Trial time (ms) \n"
+    ) +
+    scale_y_continuous(limits = c(2200, 3250)) +
+    theme_minimal()
+
+lmm_ranef
+#ggsave(paste0(SAVE,"lmm_ranef.jpeg"), plot = lmm_ranef, dpi = 600)
+```
 
