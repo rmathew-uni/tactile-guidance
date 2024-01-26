@@ -135,6 +135,7 @@ obj_name_dict = {
 79: "toothbrush"
 }
 
+
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
@@ -148,7 +149,7 @@ def run(
         #data_obj=ROOT / 'coco.yaml',  # dataset.yaml path
         #data_hand=ROOT / 'data.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
-        conf_thres=0.25,  # confidence threshold
+        conf_thres=0.7,  # confidence threshold
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
@@ -167,6 +168,7 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
+    
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -199,17 +201,22 @@ def run(
         dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
         bs = len(dataset)
 
+    vid_path, vid_writer = [None] * bs, [None] * bs
+
     # Run inference
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))  # warmup
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))  # warmup
 
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     # Milad s
-    bbox_info = []  # Initialize a list to store bounding boxs
+    bboxs_hands = []  # Initialize a list to store bounding boxs
+    bboxs_objs = []
 
     horizontal_in, vertical_in = False, False
     target_entered = False
-    target_obj = 00
+    #target_obj = 0
+    check = 1
+    check_dur = 0
 
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
@@ -238,8 +245,9 @@ def run(
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
 
-        pred =  pred_hand + pred_obj
+        #pred =  pred_hand + pred_obj
         #pred = pred_hand
+        #pred = pred_obj + pred_hand
 
         annotators_list = []
 
@@ -256,11 +264,8 @@ def run(
         annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
         # Process predictions
-        for i, det in enumerate(pred):  # per image
-            if i==0:
-                curr_labels = names_hand
-            else:
-                curr_labels = names_obj
+        for i, det in enumerate(pred_hand):  # per image
+            curr_labels = names_hand
             i = 0
             seen += 1
             '''if webcam:  # batch_size >= 1
@@ -288,7 +293,68 @@ def run(
                     # Milad s
                     # Collect bounding box information
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
-                    bbox_info.append({
+
+                    #print(f"Before: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
+
+                    #if float(conf) > DET_THRESHOLD:
+                    #print(f"After: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
+                    bboxs_hands.append({
+                        "class": int(cls),
+                        "label": curr_labels[int(cls)],
+                        "confidence": conf,
+                        "bbox": bbox
+                    })
+                    # Milad e
+                    # if save_txt:  # Write to file
+                    #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                    #
+                    #     line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
+                    #     with open(f'{txt_path}.txt', 'a') as f:
+                    #         f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                    if save_img or save_crop or view_img:  # Add bbox to image
+                        c = int(cls)  # integer class
+                        label = None if hide_labels else (curr_labels[c] if hide_conf else f'{curr_labels[c]} {conf:.2f}')
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                    # if save_crop:
+                    #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
+        
+        # Process predictions
+        for i, det in enumerate(pred_obj):  # per image
+            curr_labels = names_obj
+            i = 0
+            seen += 1
+            '''if webcam:  # batch_size >= 1
+                p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                s += f'{i}: '
+
+            p = Path(p)  # to Path
+            save_path = str(save_dir / p.name)  # im.jpg
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+            s += '%gx%g ' % im.shape[2:]  # print string
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            imc = im0.copy() if save_crop else im0  # for save_crop
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))'''
+            if len(det):
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+
+                # Print results
+                for c in det[:, 5].unique():
+                    n = (det[:, 5] == c).sum()  # detections per class
+                    s += f"{n} {curr_labels[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                # Write results
+                for *xyxy, conf, cls in reversed(det):
+                    # Milad s
+                    # Collect bounding box information
+                    bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
+
+                    #print(f"Before: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
+
+                    #if float(conf) > DET_THRESHOLD:
+                    #print(f"After: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
+                    bboxs_objs.append({
                         "class": int(cls),
                         "label": curr_labels[int(cls)],
                         "confidence": conf,
@@ -312,6 +378,7 @@ def run(
         # Stream results
         #for annotator in annotators_list:
         #    im0 += annotator.result()
+        
         im0 = annotator.result()
         if view_img:
             if platform.system() == 'Linux' and p not in windows:
@@ -322,28 +389,28 @@ def run(
             cv2.waitKey(1)  # 1 millisecond
 
 
-            #Save results (image with detections)
-            # if save_img:
-            #     if dataset.mode == 'image':
-            #         cv2.imwrite(save_path, im0)
-            #     else:  # 'video' or 'stream'
-            #         if vid_path[i] != save_path:  # new video
-            #             vid_path[i] = save_path
-            #             if isinstance(vid_writer[i], cv2.VideoWriter):
-            #                 vid_writer[i].release()  # release previous video writer
-            #             if vid_cap:  # video
-            #                 fps = vid_cap.get(cv2.CAP_PROP_FPS)
-            #                 w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            #                 h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            #             else:  # stream
-            #                 fps, w, h = 30, im0.shape[1], im0.shape[0]
-            #             save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-            #             vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-            #         vid_writer[i].write(im0)
+        # Save results (image with detections)
+        if save_img:
+            if dataset.mode == 'image':
+                cv2.imwrite(save_path, im0)
+            else:  # 'video' or 'stream'
+                if vid_path[i] != save_path:  # new video
+                    vid_path[i] = save_path
+                    if isinstance(vid_writer[i], cv2.VideoWriter):
+                        vid_writer[i].release()  # release previous video writer
+                    if vid_cap:  # video
+                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    else:  # stream
+                        fps, w, h = 30, im0.shape[1], im0.shape[0]
+                    save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                vid_writer[i].write(im0)
         # Milad s
         # Print bounding box information
-        for idx, bbox_dict in enumerate(bbox_info):
-            print(f"Label: {bbox_dict['label']}, Bbox: {bbox_dict['bbox']}")
+        #for idx, bbox_dict in enumerate(bbox_info):
+        #    print(f"Label: {bbox_dict['label']}, Bbox: {bbox_dict['bbox']}")
         # Milad e
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
@@ -355,11 +422,13 @@ def run(
             while user_in == "n":
                 print("These are the available objects:")
                 print(obj_name_dict)
-                target_obj_verb = input('Enter the object you want to target')
-                target_obj = [i for i, t in enumerate(obj_name_dict) if obj_name_dict[t]==f'{target_obj_verb}']
-                print(target_obj)
-                target_obj = target_obj[0]
-                user_in = input("Selected object is " + obj_name_dict[target_obj] + ". Correct? [y,n]")
+                target_obj_verb = input('Enter the object you want to target: ')
+
+                if target_obj_verb in obj_name_dict.values():
+                    user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
+                else:
+                    print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
+
             target_entered = True
             grasp = False
             horizontal_in, horizontal_out = False, False
@@ -368,7 +437,7 @@ def run(
             pass
 
         # Navigate the hand based on information from last frame and current frame detections
-        horizontal_out, vertical_out, grasp = navigate_hand(bbox_info, target_obj, classes_hand, horizontal_in, vertical_in, grasp)
+        horizontal_out, vertical_out, grasp, check, check_dur = navigate_hand(bboxs_hands,bboxs_objs,target_obj_verb, classes_hand, horizontal_in, vertical_in, grasp,check, check_dur)
 
         # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if horizontal_out and vertical_out and grasp:
@@ -383,7 +452,8 @@ def run(
            vertical_in = True
 
         # Clear bbox_info after applying navigation logic for the current frame
-        bbox_info = []
+        bboxs_hands = []
+        bboxs_objs = []
 
 
 # def main(weights_obj, weights_hand, source):
@@ -404,4 +474,4 @@ if __name__ == '__main__':
     source = '1'  # Input image path
     # Add other parameters as needed
 
-    run(weights_obj=weights_obj, weights_hand= weights_hand, source=source)
+    run(weights_obj=weights_obj, weights_hand=weights_hand, source=source)

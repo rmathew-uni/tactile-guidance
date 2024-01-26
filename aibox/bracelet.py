@@ -62,7 +62,7 @@ search_value_hand = "person"
 search_key_obj = "Label"
 search_value_obj = "tv"
 
-def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False):
+def navigate_hand(bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, check: int = 1, check_dur: int = 0):
     '''
     Function that navigates the hand to the target object. Handles cases when either hand or target is not detected
     Input:
@@ -83,22 +83,30 @@ def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_cor
     max_hand_confidence = 0
     max_obj_confidence = 0
 
-    print(bbox_info)
+    #print(bbox_info)
 
     bbox_hand, bbox_obj = None, None
 
     # Search for object and hand with the highest prediction confidence
-    for bbox in bbox_info:
+    for bbox in bboxs_hands:
         if bbox["class"] in search_key_hand and bbox["confidence"] > max_hand_confidence:
             bbox_hand = bbox.get("bbox")
             max_hand_confidence = bbox["confidence"]
-        elif bbox["class"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
+            print(f"hand confidence: {bbox['confidence']} \n")
+
+    for bbox in bboxs_objs:
+        if bbox["label"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
+            print(f"label: {bbox['label']}")
             bbox_obj = bbox.get("bbox")
             max_obj_confidence = bbox["confidence"]
-
+            #print(f"obj confidence: {bbox['confidence']} \n")
+ 
     # Hand is detected, object is not detected, and they are aligned horizontally and vertically - send grasp command
     # Assumption: occlusion of the object by hand
     if bbox_hand != None and bbox_obj == None and hor_correct and ver_correct:
+        print(check_dur,check)
+
+        belt_controller.stop_vibration()
 
         print("G R A S P !")
 
@@ -123,13 +131,34 @@ def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_cor
 
         grasp = True
 
-        return True, True, grasp
+        return True, True, grasp, check, check_dur
 
-    # Neither hand nor object is detected - no navigation logic to apply
+    # # Neither hand nor object is detected - no navigation logic to apply
     if bbox_hand == None or bbox_obj == None:
+        print(check_dur,check)
         belt_controller.stop_vibration()
+
+        if check == 1:
+            #belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+            if check_dur < 3:
+                check_dur += 1
+            elif check_dur >= 3:
+                check_dur = 0
+                check = 2
+                #belt_controller.stop_vibration()
+
+        if check == 2:
+            #belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+            if check_dur < 6:
+                check_dur += 1
+            elif check_dur >= 6:
+                check_dur = 0
+                check = 1
+                #belt_controller.stop_vibration()
+        
         print('no find')
-        return False, False, grasp
+    
+        return False, False, grasp, check, check_dur
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
@@ -137,31 +166,36 @@ def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_cor
     x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
 
     # This will be adjusted if within if-loop
-    x_threshold = 100
-    y_threshold = 100
+    x_threshold = 50
+    y_threshold = 50
 
-    # Vertical movement logic
-    # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
-    if abs(y_center_hand - y_center_obj) > y_threshold:
-        if y_center_hand < y_center_obj:
-            belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
-            print('down')
-        elif y_center_hand > y_center_obj:
-            belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
-            print('up')
-    else:
-        vertical = True
+    if bbox_hand != None and bbox_obj != None:
+        print(check_dur,check)
 
-    # Horizontal movement logic
-    # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
-    if abs(x_center_hand - x_center_obj) > x_threshold:
-        if x_center_hand < x_center_obj:
-            print('right')
-            belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
-        elif x_center_hand > x_center_obj:
-            print('left')
-            belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
-    else:
-        horizontal = True
+        belt_controller.stop_vibration()
 
-    return horizontal, vertical, grasp
+        # Vertical movement logic
+        # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
+        if abs(y_center_hand - y_center_obj) > y_threshold:
+            if y_center_hand < y_center_obj:
+                belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+                print('down')
+            elif y_center_hand > y_center_obj:
+                belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+                print('up')
+        else:
+            vertical = True
+
+        # Horizontal movement logic
+        # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
+        if abs(x_center_hand - x_center_obj) > x_threshold:
+            if x_center_hand < x_center_obj:
+                print('right')
+                belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+            elif x_center_hand > x_center_obj:
+                print('left')
+                belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+        else:
+            horizontal = True
+
+        return horizontal, vertical, grasp, check, check_dur
