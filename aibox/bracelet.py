@@ -133,6 +133,7 @@ def navigate_hand(bbox_info, search_key_obj: int, search_key_hand: list, hor_cor
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
+    y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
     x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
 
     # This will be adjusted if within if-loop
