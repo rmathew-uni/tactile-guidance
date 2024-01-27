@@ -185,14 +185,11 @@ def run(
 
     # Load model_obj
     device = select_device(device)
-    #model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, data=data_obj, fp16=half)
-    #model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, data=data_hand, fp16=half)
     model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, fp16=half)
     model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, fp16=half)
     stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
     stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
     imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
-    #input(data_hand)
 
     # Dataloader
     bs = 1  # batch_size
@@ -209,8 +206,8 @@ def run(
 
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     # Milad s
-    bboxs_hands = []  # Initialize a list to store bounding boxs
-    bboxs_objs = []
+    bboxs_hands = []  # Initialize a list to store bounding boxes for hands
+    bboxs_objs = [] # Initialize a list to store bounding boxes for objects
 
     horizontal_in, vertical_in = False, False
     target_entered = False
@@ -244,11 +241,6 @@ def run(
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
-
-        #pred =  pred_hand + pred_obj
-        #pred = pred_hand
-        #pred = pred_obj + pred_hand
-
         annotators_list = []
 
         if webcam:  # batch_size >= 1
@@ -263,7 +255,7 @@ def run(
         imc = im0.copy() if save_crop else im0  # for save_crop
         annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
-        # Process predictions
+        # Process hand predictions
         for i, det in enumerate(pred_hand):  # per image
             curr_labels = names_hand
             i = 0
@@ -294,10 +286,6 @@ def run(
                     # Collect bounding box information
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
 
-                    #print(f"Before: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
-
-                    #if float(conf) > DET_THRESHOLD:
-                    #print(f"After: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
                     bboxs_hands.append({
                         "class": int(cls),
                         "label": curr_labels[int(cls)],
@@ -319,7 +307,7 @@ def run(
                     # if save_crop:
                     #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
         
-        # Process predictions
+        # Process object predictions
         for i, det in enumerate(pred_obj):  # per image
             curr_labels = names_obj
             i = 0
@@ -350,10 +338,6 @@ def run(
                     # Collect bounding box information
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
 
-                    #print(f"Before: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
-
-                    #if float(conf) > DET_THRESHOLD:
-                    #print(f"After: Label {curr_labels[int(cls)]} with confidence {float(conf)}")
                     bboxs_objs.append({
                         "class": int(cls),
                         "label": curr_labels[int(cls)],
@@ -376,9 +360,6 @@ def run(
                     #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
 
         # Stream results
-        #for annotator in annotators_list:
-        #    im0 += annotator.result()
-        
         im0 = annotator.result()
         if view_img:
             if platform.system() == 'Linux' and p not in windows:
@@ -407,11 +388,7 @@ def run(
                     save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                     vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                 vid_writer[i].write(im0)
-        # Milad s
-        # Print bounding box information
-        #for idx, bbox_dict in enumerate(bbox_info):
-        #    print(f"Label: {bbox_dict['label']}, Bbox: {bbox_dict['bbox']}")
-        # Milad e
+
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
@@ -469,9 +446,9 @@ def run(
 
 
 if __name__ == '__main__':
-    weights_obj = 'aibox/yolov5s.pt'  # Model weights path
-    weights_hand = 'aibox/hand.pt'
-    source = '1'  # Input image path
+    weights_obj = 'aibox/yolov5s.pt'  # Object model weights path
+    weights_hand = 'aibox/hand.pt'# Hands model weights path
+    source = '0'  # Input image path
     # Add other parameters as needed
 
     run(weights_obj=weights_obj, weights_hand=weights_hand, source=source)
