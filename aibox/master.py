@@ -249,9 +249,9 @@ def run(
             curr_labels = names_hand
             i = 0
             seen += 1
-            if webcam:  # batch_size >= 1
-                p, im0, frame = path[i], im0s[i].copy(), dataset.count
-                s += f'{i}: '
+
+            p, im0, frame = path[i], im0s[i].copy(), dataset.count
+            s += f'{i}: '
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -302,9 +302,9 @@ def run(
             curr_labels = names_obj
             i = 0
             seen += 1
-            '''if webcam:  # batch_size >= 1
-                p, im0, frame = path[i], im0s[i].copy(), dataset.count
-                s += f'{i}: '
+
+            p, im0, frame = path[i], im0s[i].copy(), dataset.count
+            s += f'{i}: '
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -312,7 +312,8 @@ def run(
             s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))'''
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
