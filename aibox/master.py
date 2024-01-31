@@ -28,12 +28,10 @@ Usage - formats:
                                  yolov5s_paddle_model       # PaddlePaddle
 """
 
-import argparse
 import os
 import platform
 import sys
 from pathlib import Path
-import keyboard
 
 import torch
 
@@ -194,10 +192,10 @@ def run(
 
     # Dataloader
     bs = 1  # batch_size
-    if webcam:
-        view_img = check_imshow(warn=True)
-        dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
-        bs = len(dataset)
+    view_img = check_imshow(warn=True)
+    dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
+    bs = len(dataset)
+    vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))  # warmup
@@ -243,17 +241,8 @@ def run(
 
         annotators_list = []
 
-        if webcam:  # batch_size >= 1
-            p, im0, frame = path[0], im0s[0].copy(), dataset.count
-            s += f'{0}: '
-
-        p = Path(p)  # to Path
-        save_path = str(save_dir / p.name)  # im.jpg
-        txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-        s += '%gx%g ' % im.shape[2:]  # print string
-        gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-        imc = im0.copy() if save_crop else im0  # for save_crop
-        annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+        p, im0, frame = path[0], im0s[0].copy(), dataset.count
+        s += f'{0}: '
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
@@ -263,7 +252,7 @@ def run(
                 curr_labels = names_obj
             i = 0
             seen += 1
-            '''if webcam:  # batch_size >= 1
+            if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
                 s += f'{i}: '
 
@@ -273,7 +262,8 @@ def run(
             s += '%gx%g ' % im.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))'''
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -294,20 +284,11 @@ def run(
                         "confidence": conf,
                         "bbox": bbox
                     })
-                    # Milad e
-                    # if save_txt:  # Write to file
-                    #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                    #
-                    #     line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-                    #     with open(f'{txt_path}.txt', 'a') as f:
-                    #         f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (curr_labels[c] if hide_conf else f'{curr_labels[c]} {conf:.2f}')
                         annotator.box_label(xyxy, label, color=colors(c, True))
-                    # if save_crop:
-                    #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
 
         # Stream results
         #for annotator in annotators_list:
@@ -323,23 +304,23 @@ def run(
 
 
             #Save results (image with detections)
-            # if save_img:
-            #     if dataset.mode == 'image':
-            #         cv2.imwrite(save_path, im0)
-            #     else:  # 'video' or 'stream'
-            #         if vid_path[i] != save_path:  # new video
-            #             vid_path[i] = save_path
-            #             if isinstance(vid_writer[i], cv2.VideoWriter):
-            #                 vid_writer[i].release()  # release previous video writer
-            #             if vid_cap:  # video
-            #                 fps = vid_cap.get(cv2.CAP_PROP_FPS)
-            #                 w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            #                 h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            #             else:  # stream
-            #                 fps, w, h = 30, im0.shape[1], im0.shape[0]
-            #             save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-            #             vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-            #         vid_writer[i].write(im0)
+            if save_img:
+                if dataset.mode == 'image':
+                    cv2.imwrite(save_path, im0)
+                else:  # 'video' or 'stream'
+                    if vid_path[i] != save_path:  # new video
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer[i].write(im0)
         # Milad s
         # Print bounding box information
         for idx, bbox_dict in enumerate(bbox_info):
