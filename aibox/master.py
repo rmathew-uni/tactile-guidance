@@ -32,8 +32,13 @@ import os
 import platform
 import sys
 from pathlib import Path
+import keyboard
+import itertools
 
 import torch
+
+print(torch.version.cuda)
+
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -239,17 +244,33 @@ def run(
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
-        annotators_list = []
+        print(len(pred_obj))
+        print(len(pred_hand))
 
         p, im0, frame = path[0], im0s[0].copy(), dataset.count
         s += f'{0}: '
+        p, im0, frame = path[0], im0s[0].copy(), dataset.count
+        s += f'{0}: '
+
+        p = Path(p)  # to Path
+        save_path = str(save_dir / p.name)  # im.jpg
+        txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+        s += '%gx%g ' % im.shape[2:]  # print string
+        gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+        imc = im0.copy() if save_crop else im0  # for save_crop
+        annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+
+        curr_labels_obj = names_obj
+        index_add = len(curr_labels_obj)
+        curr_labels_hand = {key + index_add: value for key, value in names_hand.items()}
+        master_label = curr_labels_obj|curr_labels_hand
 
         # Process hand predictions
-        for i, det in enumerate(pred_hand):  # per image
-            curr_labels = names_hand
+        for i, (hand,object) in enumerate(itertools.zip_longest(pred_hand,pred_obj)):  # per image
+
             i = 0
             seen += 1
-
+           
             p, im0, frame = path[i], im0s[i].copy(), dataset.count
             s += f'{i}: '
 
@@ -261,85 +282,66 @@ def run(
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
-            if len(det):
+            if len(hand):
+
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                hand[:, :4] = scale_boxes(im.shape[2:], hand[:, :4], im0.shape).round()
 
                 # Print results
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {curr_labels[int(c)]}{'s' * (n > 1)}, "  # add to string
+                for c in hand[:, 5].unique():
+                    n = (hand[:, 5] == c).sum()  # detections per class
+                    s += f"{n} {master_label[int(c+index_add)]}{'s' * (n > 1)}, "  # add to string
 
-                # Write results
-                for *xyxy, conf, cls in reversed(det):
+                for i, (*xyxy, conf, cls) in enumerate(reversed(hand)):
+                    hand[-i-1][-1] = cls + index_add
+
+                    # Write results
+                for *xyxy, conf, cls in reversed(hand):
                     # Milad s
                     # Collect bounding box information
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
 
                     bboxs_hands.append({
                         "class": int(cls),
-                        "label": curr_labels[int(cls)],
+                        "label": curr_labels_hand[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
-                    # Milad e
-                    # if save_txt:  # Write to file
-                    #     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                    #
-                    #     line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-                    #     with open(f'{txt_path}.txt', 'a') as f:
-                    #         f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                    if save_img or save_crop or view_img:  # Add bbox to image
-                        c = int(cls)  # integer class
-                        label = None if hide_labels else (curr_labels[c] if hide_conf else f'{curr_labels[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                    # if save_crop:
-                    #     save_one_box(xyxy, imc, file=save_dir / 'crops' / names_obj[c] / f'{p.stem}.jpg', BGR=True)
-        
-        # Process object predictions
-        for i, det in enumerate(pred_obj):  # per image
-            curr_labels = names_obj
-            i = 0
-            seen += 1
-
-            p, im0, frame = path[i], im0s[i].copy(), dataset.count
-            s += f'{i}: '
-
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # im.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
-
-            if len(det):
+            if len(object):
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                object[:, :4] = scale_boxes(im.shape[2:], object[:, :4], im0.shape).round()
 
                 # Print results
-                for c in det[:, 5].unique():
-                    n = (det[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {curr_labels[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # Write results
-                for *xyxy, conf, cls in reversed(det):
+                for c in object[:, 5].unique():
+                    n = (object[:, 5] == c).sum()  # detections per class
+                    s += f"{n} {master_label[int(c)]}{'s' * (n > 1)}, "  # add to string
+                
+                for *xyxy, conf, cls in reversed(object):
                     # Milad s
                     # Collect bounding box information
                     bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
 
                     bboxs_objs.append({
                         "class": int(cls),
-                        "label": curr_labels[int(cls)],
+                        "label": curr_labels_obj[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
 
-                    if save_img or save_crop or view_img:  # Add bbox to image
-                        c = int(cls)  # integer class
-                        label = None if hide_labels else (curr_labels[c] if hide_conf else f'{curr_labels[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
+
+            if len(object) and len(hand):
+                boxes = torch.cat((object, hand), dim=0)
+            else:
+                boxes = object if len(object) else hand
+            
+            
+            for *xyxy, conf, cls in reversed(boxes):
+                
+                if save_img or save_crop or view_img:  # Add bbox to image
+                    c = int(cls)  # integer class
+                    label = None if hide_labels else (master_label[c] if hide_conf else f'{master_label[c]} {conf:.2f}')
+                    annotator.box_label(xyxy, label, color=colors(c, True))
 
         # Stream results
         im0 = annotator.result()
@@ -371,7 +373,7 @@ def run(
                 vid_writer[i].write(im0)
                 
         # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
         # Hand navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
@@ -429,7 +431,7 @@ def run(
 if __name__ == '__main__':
     weights_obj = 'aibox/yolov5s.pt'  # Object model weights path
     weights_hand = 'aibox/hand.pt'# Hands model weights path
-    source = '0'  # Input image path
+    source = '1'  # Input image path
     # Add other parameters as needed
 
     run(weights_obj=weights_obj, weights_hand=weights_hand, source=source)
