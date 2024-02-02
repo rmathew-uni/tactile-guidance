@@ -53,7 +53,7 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, smart_inference_mode
 
-from bracelet import navigate_hand
+from bracelet import navigate_hand, connect_belt
 
 obj_name_dict = {
 0: "person",
@@ -158,6 +158,7 @@ def run(
         nosave=False,  # do not save images/videos
         classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
         classes_hand=[0,1],
+        class_hand_nav=[80,81],
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
         visualize=False,  # visualize features
@@ -173,6 +174,9 @@ def run(
         vid_stride=1,  # video frame-rate stride_obj
     
 ):
+    connection_check, belt_controller = connect_belt()
+    print(connection_check)
+
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
@@ -199,8 +203,6 @@ def run(
     view_img = check_imshow(warn=True)
     dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
     bs = len(dataset)
-    vid_path, vid_writer = [None] * bs, [None] * bs
-
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
@@ -244,9 +246,6 @@ def run(
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
-        print(len(pred_obj))
-        print(len(pred_hand))
-
         p, im0, frame = path[0], im0s[0].copy(), dataset.count
         s += f'{0}: '
         p, im0, frame = path[0], im0s[0].copy(), dataset.count
@@ -260,10 +259,9 @@ def run(
         imc = im0.copy() if save_crop else im0  # for save_crop
         annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
-        curr_labels_obj = names_obj
-        index_add = len(curr_labels_obj)
-        curr_labels_hand = {key + index_add: value for key, value in names_hand.items()}
-        master_label = curr_labels_obj|curr_labels_hand
+        index_add = len(names_obj)
+        labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
+        master_label = names_obj|labels_hand_adj
 
         # Process hand predictions
         for i, (hand,object) in enumerate(itertools.zip_longest(pred_hand,pred_obj)):  # per image
@@ -287,13 +285,13 @@ def run(
                 # Rescale boxes from img_size to im0 size
                 hand[:, :4] = scale_boxes(im.shape[2:], hand[:, :4], im0.shape).round()
 
+                for i, (*xyxy, conf, cls) in enumerate(reversed(hand)):
+                    hand[-i-1][-1] = cls + index_add
+
                 # Print results
                 for c in hand[:, 5].unique():
                     n = (hand[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {master_label[int(c+index_add)]}{'s' * (n > 1)}, "  # add to string
-
-                for i, (*xyxy, conf, cls) in enumerate(reversed(hand)):
-                    hand[-i-1][-1] = cls + index_add
+                    s += f"{n} {master_label[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                     # Write results
                 for *xyxy, conf, cls in reversed(hand):
@@ -303,7 +301,7 @@ def run(
 
                     bboxs_hands.append({
                         "class": int(cls),
-                        "label": curr_labels_hand[int(cls)],
+                        "label": master_label[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
@@ -324,11 +322,10 @@ def run(
 
                     bboxs_objs.append({
                         "class": int(cls),
-                        "label": curr_labels_obj[int(cls)],
+                        "label": master_label[int(cls)],
                         "confidence": conf,
                         "bbox": bbox
                     })
-
 
             if len(object) and len(hand):
                 boxes = torch.cat((object, hand), dim=0)
@@ -353,7 +350,8 @@ def run(
             cv2.imshow(str(p), im0)
             cv2.waitKey(1)  # 1 millisecond
 
-        # Save results (image with detections)
+        #Save results (image with detections)
+        i = 0
         if save_img:
             if dataset.mode == 'image':
                 cv2.imwrite(save_path, im0)
@@ -397,7 +395,7 @@ def run(
             pass
 
         # Navigate the hand based on information from last frame and current frame detections
-        horizontal_out, vertical_out, grasp, check, check_dur = navigate_hand(bboxs_hands,bboxs_objs,target_obj_verb, classes_hand, horizontal_in, vertical_in, grasp,check, check_dur)
+        horizontal_out, vertical_out, grasp, check, check_dur = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp,check, check_dur)
 
         # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if horizontal_out and vertical_out and grasp:
