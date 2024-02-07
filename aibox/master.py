@@ -55,6 +55,8 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 from bracelet import navigate_hand, connect_belt
 
+from playsound import playsound
+
 obj_name_dict = {
 0: "person",
 1: "bicycle",
@@ -142,7 +144,7 @@ obj_name_dict = {
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
-        weights_hand=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
+        weights_hand=ROOT / 'hand.pt',  # model_obj path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webca
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
@@ -217,8 +219,11 @@ def run(
     horizontal_in, vertical_in = False, False
     target_entered = False
     #target_obj = 0
-    check = 1
-    check_dur = 0
+
+    manual_entry = False
+    target_objs = ['potted plant','apple','banana']
+    obj_index = 0
+    gave_command = False
 
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
@@ -248,16 +253,6 @@ def run(
 
         p, im0, frame = path[0], im0s[0].copy(), dataset.count
         s += f'{0}: '
-        p, im0, frame = path[0], im0s[0].copy(), dataset.count
-        s += f'{0}: '
-
-        p = Path(p)  # to Path
-        save_path = str(save_dir / p.name)  # im.jpg
-        txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-        s += '%gx%g ' % im.shape[2:]  # print string
-        gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-        imc = im0.copy() if save_crop else im0  # for save_crop
-        annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
         index_add = len(names_obj)
         labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
@@ -285,8 +280,8 @@ def run(
                 # Rescale boxes from img_size to im0 size
                 hand[:, :4] = scale_boxes(im.shape[2:], hand[:, :4], im0.shape).round()
 
-                for i, (*xyxy, conf, cls) in enumerate(reversed(hand)):
-                    hand[-i-1][-1] = cls + index_add
+                for k, (*xyxy, conf, cls) in enumerate(reversed(hand)):
+                    hand[-k-1][-1] = cls + index_add
 
                 # Print results
                 for c in hand[:, 5].unique():
@@ -351,67 +346,113 @@ def run(
             cv2.waitKey(1)  # 1 millisecond
 
         #Save results (image with detections)
-        i = 0
-        if save_img:
-            if dataset.mode == 'image':
-                cv2.imwrite(save_path, im0)
-            else:  # 'video' or 'stream'
-                if vid_path[i] != save_path:  # new video
-                    vid_path[i] = save_path
-                    if isinstance(vid_writer[i], cv2.VideoWriter):
-                        vid_writer[i].release()  # release previous video writer
-                    if vid_cap:  # video
-                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    else:  # stream
-                        fps, w, h = 30, im0.shape[1], im0.shape[0]
-                    save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                vid_writer[i].write(im0)
+            if save_img:
+                if dataset.mode == 'image':
+                    cv2.imwrite(save_path, im0)
+                else:  # 'video' or 'stream'
+                    if vid_path[i] != save_path:  # new video
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer[i].write(im0)
                 
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
         # Hand navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
-        if target_entered == False:
-            user_in = "n"
-            while user_in == "n":
-                print("These are the available objects:")
-                print(obj_name_dict)
-                target_obj_verb = input('Enter the object you want to target: ')
 
-                if target_obj_verb in obj_name_dict.values():
-                    user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
-                else:
-                    print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
+        if manual_entry == True:
+            if target_entered == False:
+                user_in = "n"
+                while user_in == "n":
+                    print("These are the available objects:")
+                    print(obj_name_dict)
+                    target_obj_verb = input('Enter the object you want to target: ')
 
-            target_entered = True
-            grasp = False
-            horizontal_in, horizontal_out = False, False
-            vertical_in, vertical_out = False, False
-        elif target_entered:
-            pass
+                    if target_obj_verb in obj_name_dict.values():
+                        user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
+                        file = ROOT / f'sound/{target_obj_verb}.mp3'
+                        playsound(file)
+                    else:
+                        print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
 
-        # Navigate the hand based on information from last frame and current frame detections
-        horizontal_out, vertical_out, grasp, check, check_dur = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp,check, check_dur)
+                target_entered = True
+                grasp = False
+                horizontal_in, horizontal_out = False, False
+                vertical_in, vertical_out = False, False
+                look_hand, look_obj = False, False
+            elif target_entered:
+                pass
 
-        # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-        if horizontal_out and vertical_out and grasp:
-            target_entered = False
+                # Navigate the hand based on information from last frame and current frame detections
+            horizontal_out, vertical_out, grasp, look_hand, look_obj = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, look_hand, look_obj)
 
-        #horizontal_in, vertical_in = False, False
+            # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
+            if horizontal_out and vertical_out and grasp:
+                target_entered = False
 
-        # Set values of the inputs for the next loop iteration
-        if horizontal_out:
-           horizontal_in = True
-        if vertical_out:
-           vertical_in = True
+            #horizontal_in, vertical_in = False, False
 
-        # Clear bbox_info after applying navigation logic for the current frame
-        bboxs_hands = []
-        bboxs_objs = []
+            # Set values of the inputs for the next loop iteration
+            if horizontal_out:
+                horizontal_in = True
+            if vertical_out:
+                vertical_in = True
+
+            # Clear bbox_info after applying navigation logic for the current frame
+            bboxs_hands = []
+            bboxs_objs = []
+
+        else:
+            
+            target_obj_verb = target_objs[obj_index]
+
+            if gave_command == False:
+                file = ROOT / f'sound/{target_obj_verb}.mp3'
+                playsound(file)
+                grasp = False
+                horizontal_in, horizontal_out = False, False
+                vertical_in, vertical_out = False, False
+                look_hand, look_obj = False, False
+                gave_command = True
+
+            # Navigate the hand based on information from last frame and current frame detections
+            horizontal_out, vertical_out, grasp, look_hand, look_obj = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, look_hand, look_obj)
+
+            if grasp and ((obj_index+1)<=len(target_objs)):
+                gave_command = False
+                obj_index += 1
+
+            if obj_index == len(target_objs):
+                print('Experiment Completed')
+                break
+
+            # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
+            if horizontal_out and vertical_out and grasp:
+                target_entered = False
+
+            #horizontal_in, vertical_in = False, False
+
+            # Set values of the inputs for the next loop iteration
+            if horizontal_out:
+                horizontal_in = True
+            if vertical_out:
+                vertical_in = True
+
+            # Clear bbox_info after applying navigation logic for the current frame
+            bboxs_hands = []
+            bboxs_objs = []
+        
+
 
 
 # def main(weights_obj, weights_hand, source):
