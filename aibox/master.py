@@ -220,7 +220,7 @@ def run(
     target_entered = False
     #target_obj = 0
 
-    manual_entry = False
+    manual_entry = True
     target_objs = ['potted plant','apple','banana']
     obj_index = 0
     gave_command = False
@@ -381,7 +381,7 @@ def run(
                     if target_obj_verb in obj_name_dict.values():
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         file = ROOT / f'sound/{target_obj_verb}.mp3'
-                        playsound(file)
+                        playsound(str(file))
                     else:
                         print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
 
@@ -389,12 +389,14 @@ def run(
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
-                look_hand, look_obj = False, False
+                search = False
+                count = 0
+
             elif target_entered:
                 pass
 
                 # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, look_hand, look_obj = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, look_hand, look_obj)
+            horizontal_out, vertical_out, grasp, search, count = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, search, count)
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if horizontal_out and vertical_out and grasp:
@@ -422,11 +424,12 @@ def run(
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
-                look_hand, look_obj = False, False
+                search = False
+                count = 0
                 gave_command = True
 
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, look_hand, look_obj = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, look_hand, look_obj)
+            horizontal_out, vertical_out, grasp, search, count = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, search, count)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False

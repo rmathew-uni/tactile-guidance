@@ -72,7 +72,7 @@ def connect_belt():
 
 vibration_intensity = 100
 
-def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, look_hand: bool = False, look_obj: bool = False):
+def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, search: bool = False, count: int = 0):
     '''
     Function that navigates the hand to the target object. Handles cases when either hand or target is not detected
     Input:
@@ -95,7 +95,9 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
     max_hand_confidence = 0
     max_obj_confidence = 0
-
+    x_threshold = 50
+    y_threshold = 50
+    
     #print(bbox_info)
 
     bbox_hand, bbox_obj = None, None
@@ -116,11 +118,24 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
     print(bbox_hand)
     print(bbox_obj)
+
+    # Getting horizontal and vertical position of the bounding box around target object and hand
+    if bbox_hand != None:
+
+        x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
+        y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
+    
+    if bbox_obj != None:
+
+        x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
  
     # Hand is detected, object is not detected, and they are aligned horizontally and vertically - send grasp command
     # Assumption: occlusion of the object by hand
     if bbox_hand != None and hor_correct and ver_correct:
 
+        count = 0
+        search = False
+        
         #if not mock_belt:
         belt_controller.stop_vibration()
 
@@ -142,24 +157,65 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                         clear_other_channels=False
                     )
 
-        #input('Press Enter to indicate you have grasped the object')
+        print('Please use the clicker to indicate you have grasped the object')
 
-        print('Press mouse button to indicate that the object was grasped')
-
-        # with Listener(on_click=on_click) as mouse_listener:
-        #     mouse_listener.join()
           
-        # Set up the listener for keyboard events
-        with Listener(on_press=on_press) as listener:
+        # listen for clicker
+        with Listener(on_press=on_click) as listener:
             listener.join()
 
         grasp = True
 
-        return True, True, grasp, False, False
+        return horizontal, vertical, grasp, search, count
+    
+    # if can see both hand and object but not yet aligned, navigate the hand to the object, vertical first
+    if bbox_hand != None and bbox_obj != None:
+
+        count = 0
+        search = False
+
+        # if not mock_belt:
+        #belt_controller.stop_vibration()
+
+        # Horizontal movement logic
+        # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
+        if abs(x_center_hand - x_center_obj) > x_threshold:
+            horizontal = False
+            if x_center_hand < x_center_obj:
+                print('right')
+                #if not mock_belt:
+                belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+            elif x_center_hand > x_center_obj:
+                print('left')
+                #if not mock_belt:
+                belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+        else:
+            horizontal = True
+
+
+        # Vertical movement logic
+        # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
+        if horizontal == True:
+            if abs(y_center_hand - y_center_obj) > y_threshold:
+                vertical = False
+                if y_center_hand < y_center_obj:
+                    print('down')
+                    #if not mock_belt:
+                    belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+                elif y_center_hand > y_center_obj:
+                    print('up')
+                    #if not mock_belt:
+                    belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+                    
+            else:
+                vertical = True
+
+        return horizontal, vertical, grasp, search, count
+
     
     if bbox_hand == None and bbox_obj == None:
 
-        if look_hand == False and look_obj == False:
+        if search == False:
 
             belt_controller.stop_vibration()
 
@@ -179,22 +235,28 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                         clear_other_channels=False
                     )
             
-            look_hand, look_obj = True, True
+            search = True
+
+        count += 1
+
+        if count >= 700:
+            search = False
+            count = 0
             
-        return False, False, grasp, look_hand, look_obj
+        return horizontal, vertical, grasp, search, count
     
     # if you cannot see the hand but the object is visible, tell them to move the hand around
     if bbox_hand == None and bbox_obj != None:
             
-        if look_hand == False:
+        if search == False:
 
             belt_controller.stop_vibration()
 
-            #right
+            #down
             belt_controller.send_pulse_command(
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
-                        orientation=120,
+                        orientation=60,
                         intensity=vibration_intensity,
                         on_duration_ms=250,
                         pulse_period=500,
@@ -206,78 +268,46 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                         clear_other_channels=False
                     )
             
-            look_hand = True
+            search = True
         
-        return False, False, grasp, look_hand, False
+        count += 1
+
+        if count >= 700:
+            search = False
+            count = 0
+        
+        return horizontal, vertical, grasp, search, count
     
     # if you can see the hand but not the object and are not lined up for a grasp, look around for the object
     if bbox_hand != None and bbox_obj == None:
-        # if not mock_belt:
-        # if look_obj == False:
+        #if not mock_belt:
+        if search == False:
 
-        #     belt_controller.stop_vibration()
+             belt_controller.stop_vibration()
 
-        #     #left
-        #     belt_controller.send_pulse_command(
-        #                 channel_index=0,
-        #                 orientation_type=BeltOrientationType.ANGLE,
-        #                 orientation=45,
-        #                 intensity=vibration_intensity,
-        #                 on_duration_ms=250,
-        #                 pulse_period=500,
-        #                 pulse_iterations=3,
-        #                 series_period=5000,
-        #                 series_iterations=1,
-        #                 timer_option=BeltVibrationTimerOption.RESET_TIMER,
-        #                 exclusive_channel=False,
-        #                 clear_other_channels=False
-        #             )
+             #left
+             belt_controller.send_pulse_command(
+                         channel_index=0,
+                         orientation_type=BeltOrientationType.ANGLE,
+                         orientation=120,
+                         intensity=vibration_intensity,
+                         on_duration_ms=250,
+                         pulse_period=500,
+                         pulse_iterations=3,
+                         series_period=5000,
+                         series_iterations=1,
+                         timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                         exclusive_channel=False,
+                         clear_other_channels=False
+                     )
             
-        #     look_obj = True
+             search = True
+            
+        count += 1
+
+        if count >= 700:
+            search = False
+            count = 0
         
-        return False, False, grasp, False, look_obj
-
-    # This will be adjusted in within if-loop
-    x_threshold = 50
-    y_threshold = 50
-
-    if bbox_hand != None and bbox_obj != None:
-
-        # Getting horizontal and vertical position of the bounding box around target object and hand
-        x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
-        y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
-        x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
-
-        # if not mock_belt:
-        belt_controller.stop_vibration()
-
-        # Vertical movement logic
-        # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
-        if abs(y_center_hand - y_center_obj) > y_threshold:
-            if y_center_hand < y_center_obj:
-                print('down')
-                #if not mock_belt:
-                belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
-            elif y_center_hand > y_center_obj:
-                print('up')
-                #if not mock_belt:
-                belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
-                
-        else:
-            vertical = True
-
-        # Horizontal movement logic
-        # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
-        if abs(x_center_hand - x_center_obj) > x_threshold:
-            if x_center_hand < x_center_obj:
-                print('right')
-                #if not mock_belt:
-                belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
-            elif x_center_hand > x_center_obj:
-                print('left')
-                #if not mock_belt:
-                belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
-        else:
-            horizontal = True
-
-        return horizontal, vertical, grasp, False, False
+        return horizontal, vertical, grasp, search, count
+    
