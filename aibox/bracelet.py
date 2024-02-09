@@ -24,12 +24,25 @@ from auto_connect import interactive_belt_connect, setup_logger
 
 import keyboard
 
-from pynput.mouse import Listener
+#from pynput.mouse import Listener
+from pynput.keyboard import Key, Listener
 
-def on_click(x, y, button, pressed):
-    if pressed:
-        print(f"Mouse clicked at (x, y): {x}, {y}")
+# def on_click(x, y, button, pressed):
+#     if pressed:
+#         print(f"Mouse clicked at (x, y): {x}, {y}")
+#         return False
+
+def on_click(key):
+    # Check if the pressed key is the right arrow key
+    if key == Key.page_down:
         return False
+
+# def on_release(key):
+#     # Check if the pressed key is the escape key
+#     if key == Key.esc:
+#         # Stop the listener
+#         return False
+
 
 # Variable that determines if belt is connected
 # If belt is not connected value is set to 1 and instead of vibrations print commands serve as guidance
@@ -133,8 +146,12 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         print('Press mouse button to indicate that the object was grasped')
 
-        with Listener(on_click=on_click) as mouse_listener:
-            mouse_listener.join()
+        # with Listener(on_click=on_click) as mouse_listener:
+        #     mouse_listener.join()
+          
+        # Set up the listener for keyboard events
+        with Listener(on_press=on_press) as listener:
+            listener.join()
 
         grasp = True
 
