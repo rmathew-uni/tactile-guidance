@@ -22,7 +22,8 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
 
 from auto_connect import interactive_belt_connect, setup_logger
 
-import keyboard
+import threading
+import sys
 
 #from pynput.mouse import Listener
 from pynput.keyboard import Key, Listener
@@ -31,11 +32,6 @@ from pynput.keyboard import Key, Listener
 #     if pressed:
 #         print(f"Mouse clicked at (x, y): {x}, {y}")
 #         return False
-
-def on_click(key):
-    # Check if the pressed key is the right arrow key
-    if key == Key.page_down:
-        return False
 
 # def on_release(key):
 #     # Check if the pressed key is the escape key
@@ -47,6 +43,8 @@ def on_click(key):
 # Variable that determines if belt is connected
 # If belt is not connected value is set to 1 and instead of vibrations print commands serve as guidance
 mock_belt = 0
+vibration_intensity = 100
+one_round = 0
 
 class Delegate(BeltControllerDelegate):
     # Belt controller delegate
@@ -64,15 +62,14 @@ def connect_belt():
         print("Connection failed.")
         global mock_belt
         #mock_belt = 1
-        return False
+        return False, belt_controller
     else:
         # Change belt mode to APP mode
         belt_controller.set_belt_mode(BeltMode.APP_MODE)
         return True, belt_controller
 
-vibration_intensity = 100
-
-def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, search: bool = False, count: int = 0):
+def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, obj_seen_prev: bool = False, search: bool = False, count_searching: int = 0, count_see_object: int = 0, jitter_guard: int=0, navigating: bool = False):
+    
     '''
     Function that navigates the hand to the target object. Handles cases when either hand or target is not detected
     Input:
@@ -89,7 +86,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     • check
     • check_dur
     '''
-    global mock_belt
+    global mock_belt, one_round
 
     horizontal, vertical = False, False
 
@@ -97,10 +94,58 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     max_obj_confidence = 0
     x_threshold = 50
     y_threshold = 50
+
+    global termination_signal 
+    termination_signal = False
     
     #print(bbox_info)
 
     bbox_hand, bbox_obj = None, None
+
+    def abort(key):
+        # Check if the pressed key is the right arrow key    
+        if key == Key.page_up:
+            sys.exit()
+
+    def on_click(key):
+        # Check if the pressed key is the right arrow key
+        if key == Key.page_down:
+            return False
+
+    def listener():
+
+        # listen for clicker
+        with Listener(on_press=abort) as listener:
+            listener.join()
+
+    def start_listener():
+
+        global termination_signal, one_round
+        existing_thead = threading.enumerate()
+        listener_thread = None
+
+        for thread in existing_thead:
+            if thread.name == 'clicker':
+                listener_thread = thread
+                termination_signal = False
+                break
+        
+        if listener_thread is None:
+            if one_round == 0:
+                listener_thread = threading.Thread(target=listener, name='clicker')
+                listener_thread.start()
+                one_round += 1
+            else:
+                termination_signal = True
+        
+        return termination_signal
+
+    termination_signal = start_listener()
+
+    if termination_signal:
+        print('Manual Abort')
+        belt_controller.stop_vibration()
+        sys.exit()
 
     # Search for object and hand with the highest prediction confidence
     for bbox in bboxs_hands:
@@ -131,11 +176,16 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
  
     # Hand is detected, object is not detected, and they are aligned horizontally and vertically - send grasp command
     # Assumption: occlusion of the object by hand
+
     if bbox_hand != None and hor_correct and ver_correct:
 
-        count = 0
+        obj_seen_prev = False
         search = False
-        
+        count_searching = 0
+        count_see_object = 0
+        jitter_guard = 0
+        navigating = 0
+
         #if not mock_belt:
         belt_controller.stop_vibration()
 
@@ -149,7 +199,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                         intensity=vibration_intensity,
                         on_duration_ms=150,
                         pulse_period=500,
-                        pulse_iterations=9,
+                        pulse_iterations=5,
                         series_period=5000,
                         series_iterations=1,
                         timer_option=BeltVibrationTimerOption.RESET_TIMER,
@@ -159,23 +209,28 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         print('Please use the clicker to indicate you have grasped the object')
 
-          
         # listen for clicker
         with Listener(on_press=on_click) as listener:
             listener.join()
 
         grasp = True
 
-        return horizontal, vertical, grasp, search, count
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
-    # if can see both hand and object but not yet aligned, navigate the hand to the object, vertical first
+    # if can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
     if bbox_hand != None and bbox_obj != None:
 
-        count = 0
+        obj_seen_prev = False
         search = False
+        count_searching = 0
+        count_see_object = 0
+        jitter_guard = 0
 
         # if not mock_belt:
         #belt_controller.stop_vibration()
+
+        if navigating == False:
+            belt_controller.stop_vibration()
 
         # Horizontal movement logic
         # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
@@ -189,6 +244,9 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                 print('left')
                 #if not mock_belt:
                 belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+
+            navigating = True
+
         else:
             horizontal = True
 
@@ -206,108 +264,107 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                     print('up')
                     #if not mock_belt:
                     belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
+
+                navigating = True
                     
             else:
                 vertical = True
 
-        return horizontal, vertical, grasp, search, count
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
-    
-    if bbox_hand == None and bbox_obj == None:
+    # if you cannot see the hand or the object, tell them they need to move around
+    if bbox_obj == None and grasp == False:
 
-        if search == False:
+        if obj_seen_prev == True:
+            jitter_guard = 0 
+            obj_seen_prev = False
+        
+        jitter_guard += 1
 
-            belt_controller.stop_vibration()
+        if jitter_guard >= 40:
+        
+            count_see_object = 0 
+            navigating = False
 
-            #down
-            belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=vibration_intensity,
-                        on_duration_ms=250,
-                        pulse_period=500,
-                        pulse_iterations=3,
-                        series_period=5000,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
+            #if not mock_belt:
+            if search == False:
+
+                    belt_controller.stop_vibration()
+
+                    #left
+                    belt_controller.send_pulse_command(
+                                channel_index=0,
+                                orientation_type=BeltOrientationType.ANGLE,
+                                orientation=60,
+                                intensity=vibration_intensity,
+                                on_duration_ms=250,
+                                pulse_period=500,
+                                pulse_iterations=3,
+                                series_period=5000,
+                                series_iterations=1,
+                                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                                exclusive_channel=False,
+                                clear_other_channels=False
+                            )
+                
+                    search = True
+                
+            count_searching += 1
+
+            if count_searching >= 150:
+                search = False
+                count_searching = 0
             
-            search = True
-
-        count += 1
-
-        if count >= 700:
-            search = False
-            count = 0
-            
-        return horizontal, vertical, grasp, search, count
-    
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        
     # if you cannot see the hand but the object is visible, tell them to move the hand around
-    if bbox_hand == None and bbox_obj != None:
-            
-        if search == False:
+    if bbox_obj != None:
 
-            belt_controller.stop_vibration()
-
-            #down
-            belt_controller.send_pulse_command(
-                        channel_index=0,
-                        orientation_type=BeltOrientationType.ANGLE,
-                        orientation=60,
-                        intensity=vibration_intensity,
-                        on_duration_ms=250,
-                        pulse_period=500,
-                        pulse_iterations=3,
-                        series_period=5000,
-                        series_iterations=1,
-                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                        exclusive_channel=False,
-                        clear_other_channels=False
-                    )
-            
-            search = True
-        
-        count += 1
-
-        if count >= 700:
+        if search == True:
+            jitter_guard = 0
             search = False
-            count = 0
+
+        jitter_guard += 1
+
+        if jitter_guard >= 40:
+            
+            navigating = False
+            count_searching = 0
+            
+            if obj_seen_prev == False:
+
+                belt_controller.stop_vibration()
+
+                #down
+                belt_controller.send_pulse_command(
+                            channel_index=0,
+                            orientation_type=BeltOrientationType.ANGLE,
+                            orientation=60,
+                            intensity=vibration_intensity,
+                            on_duration_ms=100,
+                            pulse_period=500,
+                            pulse_iterations=2,
+                            series_period=5000,
+                            series_iterations=1,
+                            timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                            exclusive_channel=False,
+                            clear_other_channels=False
+                        )
+                
+                obj_seen_prev = True
+            
+            count_see_object += 1
+
+            if count_see_object >= 100:
+                obj_seen_prev = False
+                count_see_object = 0
         
-        return horizontal, vertical, grasp, search, count
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
-    # if you can see the hand but not the object and are not lined up for a grasp, look around for the object
-    if bbox_hand != None and bbox_obj == None:
-        #if not mock_belt:
-        if search == False:
+    else:
 
-             belt_controller.stop_vibration()
+        print('Error')
 
-             #left
-             belt_controller.send_pulse_command(
-                         channel_index=0,
-                         orientation_type=BeltOrientationType.ANGLE,
-                         orientation=120,
-                         intensity=vibration_intensity,
-                         on_duration_ms=250,
-                         pulse_period=500,
-                         pulse_iterations=3,
-                         series_period=5000,
-                         series_iterations=1,
-                         timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                         exclusive_channel=False,
-                         clear_other_channels=False
-                     )
-            
-             search = True
-            
-        count += 1
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
-        if count >= 700:
-            search = False
-            count = 0
-        
-        return horizontal, vertical, grasp, search, count
     

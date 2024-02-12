@@ -37,8 +37,7 @@ import itertools
 
 import torch
 
-print(torch.version.cuda)
-
+#print(torch.version.cuda)
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -177,7 +176,11 @@ def run(
     
 ):
     connection_check, belt_controller = connect_belt()
-    print(connection_check)
+    if connection_check:
+        print('Belt connection successful')
+    else:
+        print('Error connecting belt. Aborting.')
+        sys.exit()
 
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -220,8 +223,8 @@ def run(
     target_entered = False
     #target_obj = 0
 
-    manual_entry = True
-    target_objs = ['potted plant','apple','banana']
+    manual_entry = False
+    target_objs = ['cup','banana']
     obj_index = 0
     gave_command = False
 
@@ -389,17 +392,17 @@ def run(
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
-                search = False
-                count = 0
+                obj_seen_prev, search, navigating = False, False, False
+                count_searching, count_see_object, jitter_guard = 0,0,0
 
             elif target_entered:
                 pass
 
                 # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, search, count = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, search, count)
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-            if horizontal_out and vertical_out and grasp:
+            if grasp:
                 target_entered = False
 
             #horizontal_in, vertical_in = False, False
@@ -420,16 +423,16 @@ def run(
 
             if gave_command == False:
                 file = ROOT / f'sound/{target_obj_verb}.mp3'
-                playsound(file)
+                playsound(str(file))
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
-                search = False
-                count = 0
                 gave_command = True
+                obj_seen_prev, search, navigating = False, False, False
+                count_searching, count_see_object, jitter_guard = 0,0,0
 
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, search, count = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, search, count)
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
