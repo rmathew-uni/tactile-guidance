@@ -152,17 +152,14 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
         if bbox["class"] in search_key_hand and bbox["confidence"] > max_hand_confidence:
             bbox_hand = bbox.get("bbox")
             max_hand_confidence = bbox["confidence"]
-            print(f"hand confidence: {bbox['confidence']} \n")
+            #print(f"hand confidence: {bbox['confidence']} \n")
 
     for bbox in bboxs_objs:
         if bbox["label"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
-            print(f"label: {bbox['label']}")
+            #print(f"label: {bbox['label']}")
             bbox_obj = bbox.get("bbox")
             max_obj_confidence = bbox["confidence"]
-            print(f"obj confidence: {bbox['confidence']} \n")
-
-    print(bbox_hand)
-    print(bbox_obj)
+            #print(f"obj confidence: {bbox['confidence']} \n")
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if bbox_hand != None:
@@ -363,7 +360,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     
     else:
 
-        print('Error')
+        print('Condition not covered by logic. Maintaining variables and standing by.')
 
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 

@@ -139,7 +139,6 @@ obj_name_dict = {
 79: "toothbrush"
 }
 
-
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
@@ -173,8 +172,20 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
-    
+        manual_entry=False # True means you will control the exp manually versus the standard automatic running
 ):
+
+    if manual_entry == False:
+        target_objs = ['cup','banana']
+        obj_index = 0
+        gave_command = False
+
+        print('The experiment will be run automatically. The selected target objects, in sequence, are:')
+        print(target_objs)
+
+    else:
+        print('The experiment will be run manually. You will enter the desired target for each run yourself.')
+    
     connection_check, belt_controller = connect_belt()
     if connection_check:
         print('Belt connection successful')
@@ -221,12 +232,6 @@ def run(
 
     horizontal_in, vertical_in = False, False
     target_entered = False
-    #target_obj = 0
-
-    manual_entry = False
-    target_objs = ['cup','banana']
-    obj_index = 0
-    gave_command = False
 
     # Milad e
     for path, im, im0s, vid_cap, s in dataset:
@@ -368,7 +373,7 @@ def run(
                     vid_writer[i].write(im0)
                 
         # Print time (inference-only)
-        LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        #LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
         # Hand navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
