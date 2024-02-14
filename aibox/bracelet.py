@@ -103,7 +103,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     bbox_hand, bbox_obj = None, None
 
     def abort(key):
-        # Check if the pressed key is the right arrow key    
+        # Check if the pressed key is the left arrow key    
         if key == Key.page_up:
             sys.exit()
 
@@ -161,12 +161,13 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
             max_obj_confidence = bbox["confidence"]
             #print(f"obj confidence: {bbox['confidence']} \n")
 
-    # Getting horizontal and vertical position of the bounding box around target object and hand
+    # Getting horizontal and vertical position of the bounding box around tbarget object and hand
     if bbox_hand != None:
 
         x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
-        y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
-    
+        #y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
+        y_center_hand = y_center_hand - (bbox_hand[3]/2)
+
     if bbox_obj != None:
 
         x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]

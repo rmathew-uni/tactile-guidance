@@ -56,6 +56,8 @@ from bracelet import navigate_hand, connect_belt
 
 from playsound import playsound
 
+import threading
+
 obj_name_dict = {
 0: "person",
 1: "bicycle",
@@ -139,6 +141,14 @@ obj_name_dict = {
 79: "toothbrush"
 }
 
+def playstart():
+    file = ROOT / f'sound/beginning.mp3'
+    playsound(str(file))
+
+def play_start():
+    play_start_thread = threading.Thread(target=playstart, name='play_start')
+    play_start_thread.start()
+
 @smart_inference_mode()
 def run(
         weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
@@ -176,7 +186,8 @@ def run(
 ):
 
     if manual_entry == False:
-        target_objs = ['cup','banana']
+        target_objs = ['cup','banana','potted plant','bicycle','apple','clock','wine glass']
+        #target_objs = ['wine glass']
         obj_index = 0
         gave_command = False
 
@@ -193,7 +204,15 @@ def run(
         print('Error connecting belt. Aborting.')
         sys.exit()
 
-    source = str(source)
+    try:
+        source = str(source)
+        print('Camera connection successful')
+    except:
+        print('Cannot access selected source. Aborting.')
+        sys.exit()
+    
+    play_start()
+
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
@@ -444,6 +463,8 @@ def run(
                 obj_index += 1
 
             if obj_index == len(target_objs):
+                file = ROOT / f'sound/ending.mp3'
+                playsound(str(file))
                 print('Experiment Completed')
                 break
 
@@ -463,8 +484,6 @@ def run(
             bboxs_hands = []
             bboxs_objs = []
         
-
-
 
 # def main(weights_obj, weights_hand, source):
 #     '''
