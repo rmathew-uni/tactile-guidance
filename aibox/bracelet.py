@@ -293,9 +293,9 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                     belt_controller.send_pulse_command(
                                 channel_index=0,
                                 orientation_type=BeltOrientationType.ANGLE,
-                                orientation=60,
+                                orientation=45,
                                 intensity=vibration_intensity,
-                                on_duration_ms=250,
+                                on_duration_ms=100,
                                 pulse_period=500,
                                 pulse_iterations=3,
                                 series_period=5000,
@@ -337,11 +337,11 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                 belt_controller.send_pulse_command(
                             channel_index=0,
                             orientation_type=BeltOrientationType.ANGLE,
-                            orientation=60,
+                            orientation=120,
                             intensity=vibration_intensity,
                             on_duration_ms=100,
                             pulse_period=500,
-                            pulse_iterations=2,
+                            pulse_iterations=3,
                             series_period=5000,
                             series_iterations=1,
                             timer_option=BeltVibrationTimerOption.RESET_TIMER,
@@ -353,7 +353,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
             
             count_see_object += 1
 
-            if count_see_object >= 100:
+            if count_see_object >= 150:
                 obj_seen_prev = False
                 count_see_object = 0
         
