@@ -54,7 +54,7 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 
-
+# Yolov5 objects and their IDs
 obj_name_dict = {
 0: "person",
 1: "bicycle",
@@ -163,8 +163,8 @@ def run(
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
-        classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class: --class 0, or --class 0 2 3 / check coco.yaml file - person class is 0
-        classes_hand=[0,1],
+        classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class /  check coco.yaml file or obj_name_dict variable in this script
+        classes_hand=[0,1], 
         class_hand_nav=[80,81],
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
