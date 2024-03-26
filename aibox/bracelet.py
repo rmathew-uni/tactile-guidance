@@ -1,19 +1,3 @@
-# Some comments:
-
-# issues.... perhaps every n frame this bbox_info should be wipped clean....
-# or when the hand reaches an object.....
-# empty it when it reaches the object or empty it within limited frame, like 20 or 50....
-
-# now we have four numbers...which we need two of them the first two...
-# write a function so it would outout left, right, up, down so the two number reach each other!!!!
-
-# bbox_info ---- This is a list...each element is dictionary which had the key label and bbox
-# we only need to accses the label that is person....and one other object
-# then these two are needed for always....
-
-# xywh --- xy is the center!
-# simple version of bounding boxes
-
 import time
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
@@ -25,19 +9,7 @@ from auto_connect import interactive_belt_connect, setup_logger
 import threading
 import sys
 
-#from pynput.mouse import Listener
 from pynput.keyboard import Key, Listener
-
-# def on_click(x, y, button, pressed):
-#     if pressed:
-#         print(f"Mouse clicked at (x, y): {x}, {y}")
-#         return False
-
-# def on_release(key):
-#     # Check if the pressed key is the escape key
-#     if key == Key.esc:
-#         # Stop the listener
-#         return False
 
 
 # Variable that determines if belt is connected
