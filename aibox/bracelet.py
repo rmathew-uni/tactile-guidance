@@ -64,6 +64,8 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
     max_hand_confidence = 0
     max_obj_confidence = 0
+    
+    # Diffrence between the hand xy and object xy
     x_threshold = 50
     y_threshold = 50
 
@@ -75,12 +77,12 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     bbox_hand, bbox_obj = None, None
 
     def abort(key):
-        # Check if the pressed key is the left arrow key    
+        # Check if the pressed key is the left clicker key    
         if key == Key.page_up:
             sys.exit()
 
     def on_click(key):
-        # Check if the pressed key is the right arrow key
+        # Check if the pressed key is the right clicker key
         if key == Key.page_down:
             return False
 
@@ -137,7 +139,6 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     if bbox_hand != None:
 
         x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
-        #y_center_hand = bbox_hand[1] - (bbox_hand[3] / 4)
         y_center_hand = y_center_hand - (bbox_hand[3]/2)
 
     if bbox_obj != None:
@@ -187,7 +188,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
-    # if can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
+    # If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
     if bbox_hand != None and bbox_obj != None:
 
         obj_seen_prev = False
@@ -242,7 +243,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
-    # if you cannot see the hand or the object, tell them they need to move around
+    # if the camera cannot see the hand or the object, tell them they need to move around
     if bbox_obj == None and grasp == False:
 
         if obj_seen_prev == True:
@@ -287,7 +288,7 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
             
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
         
-    # if you cannot see the hand but the object is visible, tell them to move the hand around
+    # if the camera cannot see the hand but the object is visible, tell them to move the hand around
     if bbox_obj != None:
 
         if search == True:
