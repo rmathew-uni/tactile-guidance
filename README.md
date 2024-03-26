@@ -1,24 +1,25 @@
-# OptiVisT: Supporting grasping movements in the visually impaired
+# OptiVisT
+# Helping Blind People Grasp: Evaluating a Tactile Bracelet for Remotely Guiding Grasping Movements
 
-Silke M. Kärcher<sup>1</sup>, Ramon Zacharias<sup>2</sup>, Piper Powell<sup>2</sup>, Milad Rouygari<sup>2</sup>, Florian Pätzold<sup>2</sup>, Peter König<sup>1,2</sup>  
+## Contributors
+Piper Powell<sup>2</sup>, Florian Pätzold<sup>2</sup>, Milad Rouygari<sup>2</sup>, Marcin Furtak<sup>1,2</sup>, Silke Kärcher<sup>1</sup>, Peter König<sup>1,2</sup>  
 <sup>1</sup>feelSpace GmbH, Albert-Einstein-Straße 1, 49076 Osnabrück  
 <sup>2</sup>Institute of Cognitive Science, 49060 University Osnabrück
 
+## Abstract
 <p align="justify">
-Many devices support visually impaired and blind people in spatial navigation, but the problem of enabling meaningful object interaction is neglected. Here, we present an innovative approach, combining an established tactile interface technology, a computer vision system, and modern AI techniques to allow visually impaired and blind people to grasp objects. <br/>
-We adapted a tactile belt to enhance spatial navigation of sighted, visually impaired, and blind people [1,2] to a bracelet worn on the wrist. The bracelet is connected to a microcontroller and includes four motors for cueing up/down/left/right directions. A PC captures the video stream supplied by a camera mounted on a standard bicycle helmet. Either the experimenter or a computer vision system translates the hand's and object's relative positions to the required movement direction. This is relayed to the bracelet, guiding the participant toward the desired object. <br/>
-We tested the design with single objects in the first series of experiments. We found that a placement directly on the ulnar is unfavorable and leads to confusion of down and left/right signals. Moving the tactile element off the bone onto the soft issue resolved this problem. Further, once an appropriate hand position is reached, we found the pulsed activation of tactile elements a suitable signal initiating forward movement and the cessation of the vibration to initiate the grasp proper. <br/>
-In the second experiment, the participant performed the task of grasping a variety of objects, easily identifiable colorful artificial fruits. Sighted people perform this task in a fraction of a second. Our participants were performing the task blindfolded with auditory instructions and required an average of 4.3s until a successful grasp. With tactile guidance, a successful grasp was achieved within 6.1s on average. <br/>
-These results demonstrate the feasibility of tactile guidance of grasping movements. In the present design, performance is slightly slower than with auditory instructions. However, the system increases the self-reliance of the participants, a property highly valued by visually impaired and blind people. Further improvements, such as a predictive computation of the guiding signal that compensates for the human reaction time, hold the prospect of enhancing system performance further. <br/>
-</p>
+The problem of supporting visually impaired and blind people in meaningful interaction with objects is often neglected. To address this issue, we adapted a tactile belt for enhanced spatial navigation into a bracelet worn on the wrist that allows visually impaired people to grasp target objects. Participants' performance in locating and grasping target items when guided with the bracelet, which provides direction commands via vibrotactile signals, was compared to their performance when receiving auditory instructions. While participants were faster with the auditory commands, they also performed well with the bracelet, encouraging future development of this and similar systems.
 
-[1] Brandebusemeyer C, Luther A R, König S U, König P & Kärcher S M. Impact of a Vibrotactile Belt on Emotionally Challenging Everyday Situations of the Blind. Sensors Basel Switz 21: 7384 (2021).  
+## Repo & Use Guide
+In this repo, you will find the code both for the blindfolded trials and for the early AI work. The code for the blindfolded trials is contained in the `flobox` folder, while the code for the AI paradigm is in the `aibox` folder. 
 
-[2] Kärcher S M, Fenzlaff S, Hartmann D, Nagel S K & König P. Sensory augmentation for the blind. Front Hum Neurosci 6: 37 (2012).
+### FloBox (Blindfolded Trials)
+Within the `flobox` folder, you will find the `Experiment` directory, which contains the code for running the blindfolded trials. To run this experiment, run the `tactile_exp_original.py` script. It will reference the `connect.py` script in the same folder to connect to the tactile bracelet. The `Data` folder in the `Experiment` directory contains the collected data (anonymous) for the blindfolded trials. The `Analysis` folder contains the analysis files for analyzing the collected data. In the `flobox` folder, you will also find the `Resources` directory, where old and no longer used files for the blindfolded trials are stored. Note that the file structure image in this directory is slightly out of date. 
 
-### Folder structure
+### AiBox (AI Paradigm)
+Within the `aibox` folder, you will find all code necessary for running the AI paradigm. The `Dataset/Scripts` directory contains scripts that were used to create versions of the hand and object datasets that were ultimately not used (these were from early attempts to create a single network and became irrelevant when a two network approach was adopted). The `Resources/Code` directory also contains old files that are no longer used. The `Testing` and `Training` directories contain the files needed to train and test the network on a SLURM based high performance computing network (note that the actual training files that would be referenced in the training SLURM scripts are not present, as the networks were trained with the standard Ultralytics training code (`train.py`), obtainable from this [repo](https://github.com/ultralytics/yolov5)). It is not necessary to train the networks yourself to utilize our code here, as we provide the weights files for both networks being used. The `deep_sort_pytorch...` directory can be ignored; this was a directory for the early work on object tracking (the current software being solely for object recognition. The `models` and `utils` directories are copied from the Ultralytics software, as they are needed to run the YOLOv5 models used in our project (which are from the Ultralytics implementation, see the sectiob below on installing Ultralytics). The `sound` directory contains the sound files which are called in the AI trials to announce the start and end of the experiment and the current object being grasped. 
 
-![folder structure](https://github.com/pippowell/OptiVisT/blob/main/flobox/Resources/Presentations/folder_structure.png)
+Reference this file structure image for an overview of the scripts and folders needed to run the AI paradigm - [AI Paradigm](https://github.com/pippowell/OptiVisT/file_guide_opti.png). 
 
 ### Installing Ultralytics
 For the networks to run, you need both the latest ultralytics package (which is actually for YOLOv8) and the separate package for YOLOv5. 
