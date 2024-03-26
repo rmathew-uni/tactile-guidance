@@ -242,14 +242,14 @@ def run(
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))  # warmup
 
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
-    # Milad s
-    bboxs_hands = []  # Initialize a list to store bounding boxes for hands
-    bboxs_objs = [] # Initialize a list to store bounding boxes for objects
+    
+    # # Initialize a list to store bounding boxes for hands and objects
+    bboxs_hands = []  
+    bboxs_objs = [] 
 
     horizontal_in, vertical_in = False, False
     target_entered = False
 
-    # Milad e
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im_obj = torch.from_numpy(im).to(model_obj.device)
