@@ -41,7 +41,9 @@ def get_input_meta() -> _metadata_fb.TensorMetadataT:
         _metadata_fb.ContentProperties.ImageProperties
     )
     input_normalization = _metadata_fb.ProcessUnitT()
-    input_normalization.optionsType = _metadata_fb.ProcessUnitOptions.NormalizationOptions
+    input_normalization.optionsType = (
+        _metadata_fb.ProcessUnitOptions.NormalizationOptions
+    )
     input_normalization.options = _metadata_fb.NormalizationOptionsT()
     input_normalization.options.mean = [127.5]
     input_normalization.options.std = [127.5]
@@ -81,7 +83,7 @@ def generate_metadata(tflite_model, model_type: str) -> bytes | text_type:
     # Create input, output and graph metadata
     subgraph = _metadata_fb.SubGraphMetadataT()
     subgraph.inputTensorMetadata = [get_input_meta()]
-    subgraph.outputTensorMetadata = [output_meta] * 4
+    subgraph.outputTensorMetadata = [output_meta]
     model_meta.subgraphMetadata = [subgraph]
 
     # Put the metadata into the .tflite binary object
@@ -107,9 +109,8 @@ def export_tflite_model(
     # converter.target_spec.supported_types = [tf.float16]
     converter.target_spec.supported_ops = [
         tf.lite.OpsSet.TFLITE_BUILTINS,  # enable TensorFlow Lite ops.
-        tf.lite.OpsSet.SELECT_TF_OPS  # enable TensorFlow ops.
+        tf.lite.OpsSet.SELECT_TF_OPS,  # enable TensorFlow ops.
     ]
-
 
     tflite_model = converter.convert()
 
@@ -118,10 +119,6 @@ def export_tflite_model(
 
     with storage_path.open("wb") as save_loc:
         save_loc.write(tflite_model)
-
-
-def export_object_model(tf_saved_model_dir: Path, storage_path) -> None:
-    raise NotImplementedError()
 
 
 def parse_opt():
