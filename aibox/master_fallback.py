@@ -16,11 +16,10 @@ from pathlib import Path
 import itertools
 import time
 
+# Configure relative path
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
-
 sys.path.append(str(ROOT) + '/yolov5')
-
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
@@ -144,6 +143,7 @@ def load_tracker(model_type, weights, device):
             ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
             )         
     else:
+        raise NotImplementedError("I noticed that StrongSORT is using the same code as DeepSORT, i.e. use model_type = 'strongsort'.")
         model = DeepSort(
             max_iou_distance=0.7,
             max_age=30,
@@ -160,7 +160,7 @@ def load_tracker(model_type, weights, device):
             embedder_model_name=None,
             embedder_wts=None,
             polygon=False,
-            today= None
+            today=None
         )
     return model
 
@@ -179,7 +179,42 @@ def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
         count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
     
     return detections, count
+
+
+def update_deepsort(tracker, xywhs, confs, clss, frame):
+    # Convert tensors to Python lists
+    xywhs_list = xywhs.tolist()
+    confs_list = confs.tolist()
+    clss_list = clss.tolist()
+
+    # Create raw detections list
+    raw_detections = []
+    for i in range(len(xywhs_list)):
+        detection = (xywhs_list[i], confs_list[i], clss_list[i])
+        raw_detections.append(detection)
+
+    tracks = tracker.update_tracks(raw_detections, frame=frame)
+
+    outputs = []
+    for track in tracks:
+        if not track.is_confirmed():
+            continue
+        bbox = track.to_ltwh()  # alternative formats: original_ltwh, to_tlwh(), to_ltwh(), to_tlbr(), to_ltrb()
+        left, top, width, height = bbox
+        center_x = int(left + width / 2)
+        center_y = int(top + height / 2)
+        bbox = [center_x, center_y, width, height]
+        if not isinstance(bbox, list):
+            bbox = bbox.tolist() # only necessary if above calculations are not saved in a list already
+        tracked_id = track.track_id
+        class_id = track.det_class
+        confidence = track.det_conf
+        detection = bbox + [int(tracked_id), int(class_id), confidence]  # Combine bbox, class_id, and confidence
+        outputs.append(detection)
     
+    # Currently does not work, detections for "lost" tracks are saved, but confidence is NoneType
+    return outputs
+
 
 def playstart():
     file = ROOT / f'resources/sound/beginning.mp3'
@@ -229,26 +264,29 @@ def run(
         manual_entry=False # True means you will control the exp manually versus the standard automatic running
 ):
 
-    if manual_entry == False:
-        target_objs = ['cup','banana','potted plant','bicycle','apple','clock','wine glass']
-        obj_index = 0
-        gave_command = False
-
-        print('The experiment will be run automatically. The selected target objects, in sequence, are:')
-        print(target_objs)
-    else:
-        print('The experiment will be run manually. You will enter the desired target for each run yourself.')
-    
+    # region main setup
+    # Check camera connection
     try:
         source = str(source)
         print('Camera connection successful')
     except:
         print('Cannot access selected source. Aborting.')
         sys.exit()
-    
-    # Play welcome sound
-    play_start()
 
+    # Experiment setup
+    if manual_entry == False:
+        target_objs = ['cup','banana','potted plant','bicycle','apple','clock','wine glass']
+        obj_index = 0
+        gave_command = False
+        print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
+    else:
+        print('The experiment will be run manually. You will enter the desired target for each run yourself.')
+
+    horizontal_in, vertical_in = False, False
+    target_entered = False
+    play_start()  # play welcome sound
+
+    # Configure flags
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
@@ -265,13 +303,11 @@ def run(
     device = select_device(device)
     model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, fp16=half)
     model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, fp16=half)
+
     stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
     stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
     imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
-
-    # Load tracker
-    tracker = load_tracker(model_type='strongsort', weights=weights_tracker, device=device)
-    #tracker = load_tracker(model_type='deepsort', weights=weights_tracker, device=device)
+    seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
     # Dataloader
     bs = 1  # batch_size
@@ -280,32 +316,31 @@ def run(
     bs = len(dataset)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
+    # Create combined label dictionary
+    index_add = len(names_obj)
+    labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
+    master_label = names_obj | labels_hand_adj
+
+    # Load tracker model
+    model_type='strongsort'
+    tracker = load_tracker(model_type=model_type, weights=weights_tracker, device=device)
+
     # Warmup models
-    model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))  # warmup
-    model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))  # warmup
+    model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
+    model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
     if hasattr(tracker, 'model'):
         if hasattr(tracker.model, 'warmup'):
             tracker.model.warmup()
-
-    seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
-    
-    # Initialize a list to store bounding boxes for hands and objects
-    bboxs_hands = []  
-    bboxs_objs = []
-    bboxs = []
-
-    horizontal_in, vertical_in = False, False
-    target_entered = False
 
     # Initialize vars for tracking
     prev_frames = None
     curr_frames = None
     outputs = None
+    bboxs_hands = []  
+    bboxs_objs = []
+    bboxs = []
 
-    # Create combined label dictionary
-    index_add = len(names_obj)
-    labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
-    master_label = names_obj | labels_hand_adj
+    # endregion
 
     # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -332,6 +367,7 @@ def run(
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
+        # region main object tracking
         # Process predictions
         for i, (hand,object) in enumerate(itertools.zip_longest(pred_hand,pred_obj)):  # per image
             seen += 1
@@ -359,40 +395,53 @@ def run(
             if len(object):
                 object, s = preprocess_detections(object, im, im0, master_label, s)
 
-            # Track hands and objects
-            xywhs_hand = xyxy2xywh(hand[:, 0:4])
-            confs_hand = hand[:, 4]
-            clss_hand = hand[:, 5]
-            xywhs_obj = xyxy2xywh(object[:, 0:4])
-            confs_obj = object[:, 4]
-            clss_obj = object[:, 5]
-            # Concatenate tracked hands and objects and hands and update tracker
-            xywhs = torch.cat((xywhs_hand, xywhs_obj), dim=0)
-            confs = torch.cat((confs_hand, confs_obj), dim=0)
-            clss = torch.cat((clss_hand, clss_obj), dim=0)
-            outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+            if len(hand) or len(object):
+                # Track hands and objects
+                xywhs_hand = xyxy2xywh(hand[:, 0:4])
+                confs_hand = hand[:, 4]
+                clss_hand = hand[:, 5]
+                xywhs_obj = xyxy2xywh(object[:, 0:4])
+                confs_obj = object[:, 4]
+                clss_obj = object[:, 5]
+                # Concatenate tracked hands and objects and hands and update tracker
+                xywhs = torch.cat((xywhs_hand, xywhs_obj), dim=0)
+                confs = torch.cat((confs_hand, confs_obj), dim=0)
+                clss = torch.cat((clss_hand, clss_obj), dim=0)
 
-            # Write results
-            for *xyxy, obj_id, cls, conf in outputs:
-                print(f'Detections:\n{outputs}')
-                # Collect bounding box information
-                bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
-                id = int(obj_id)
-                c = int(cls)  # integer class
+                if model_type == 'strongsort':
+                    outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                    print(f'Detections:\n{outputs}')
+                elif model_type == 'deepsort':
+                    outputs = update_deepsort(tracker, xywhs, confs, clss, im0)
+                    print(f'Detections:\n{outputs}')
+                else:
+                    print('Tracker was not correctly initialized.')
 
-                bboxs.append({
-                    "class": c,
-                    "label": master_label[c],
-                    "confidence": conf,
-                    "id": id,
-                    "bbox": bbox
-                })
+                # Write results
+                for *xywh, obj_id, cls, conf in outputs:
+                    #print(f'Detections:\n{outputs}')
+                    # Collect bounding box information
+                    bbox = xywh
+                    id = int(obj_id)
+                    c = int(cls)  # integer class
 
-                # add BBs to annotator here
-                if save_img or save_crop or view_img:  # Add bbox to image
-                    label = None if hide_labels else (f'ID: {id} {master_label[c]}' if hide_conf else (f'ID: {id} {master_label[c]} {conf:.2f}'))
-                    annotator.box_label(xyxy, label, color=colors(c, True))
+                    bboxs.append({
+                        "class": c,
+                        "label": master_label[c],
+                        "confidence": conf,
+                        "id": id,
+                        "bbox": bbox
+                    })
 
+                    # add BBs to annotator here
+                    if save_img or save_crop or view_img:  # Add bbox to image
+                        label = None if hide_labels else (f'ID: {id} {master_label[c]}' if hide_conf else (f'ID: {id} {master_label[c]} {conf:.2f}'))
+                        annotator.box_label(xywh, label, color=colors(c, True))
+                        if save_crop:
+                            txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                            save_one_box(xywh, imc, file=save_dir / 'crops' / txt_file_name / master_label[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+
+            # Get FPS
             end = time.perf_counter()
             runtime = end - start
             fps = 1 / runtime
@@ -407,35 +456,35 @@ def run(
                 cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
             cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
-            #cv2.waitKey(1)  # 1 millisecond
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        #Save results (image with detections)
-            if save_img:
-                if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
-                else:  # 'video' or 'stream'
-                    if vid_path[i] != save_path:  # new video
-                        vid_path[i] = save_path
-                        if isinstance(vid_writer[i], cv2.VideoWriter):
-                            vid_writer[i].release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer[i].write(im0)
+        # Save results (image with detections)
+        if save_img:
+            if dataset.mode == 'image':
+                cv2.imwrite(save_path, im0)
+            else:  # 'video' or 'stream'
+                if vid_path[i] != save_path:  # new video
+                    vid_path[i] = save_path
+                    if isinstance(vid_writer[i], cv2.VideoWriter):
+                        vid_writer[i].release()  # release previous video writer
+                    if vid_cap:  # video
+                        fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                        w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                        h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    else:  # stream
+                        fps, w, h = 30, im0.shape[1], im0.shape[0]
+                    save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                vid_writer[i].write(im0)
                 
         # Print time (inference-only)
         #LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
-        # Hand navigation loop
-        # After passing target object class hand is navigated in each frame until grasping command is sent
+        # endregion
 
+        # region main navigation loop
+        # After passing target object class hand is navigated in each frame until grasping command is sent
         if manual_entry == True:
             if target_entered == False:
                 user_in = "n"
@@ -481,7 +530,6 @@ def run(
             bboxs_objs = []
 
         else:
-            
             target_obj_verb = target_objs[obj_index]
 
             if gave_command == False:
@@ -522,6 +570,9 @@ def run(
             # Clear bbox_info after applying navigation logic for the current frame
             bboxs_hands = []
             bboxs_objs = []
+        
+        # endregion
+
         
 
 if __name__ == '__main__':
