@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 import itertools
 import time
+import numpy as np
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -315,6 +316,17 @@ def run(
 
         # Image pre-processing
         with dt[0]:
+            '''
+            im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
+            im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
+            #configure CLAHE
+            clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
+            #0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
+            im[:,:,0] = clahe.apply(im[:,:,0])
+            im = cv2.cvtColor(im, cv2.COLOR_Lab2RGB)
+            im = np.transpose(im, (2,0,1))
+            im = np.expand_dims(im, axis=0)
+            '''
             image = torch.from_numpy(im).to(model_obj.device)
             image = image.half() if model_obj.fp16 else image.float()  # uint8 to fp16/32
             image /= 255  # 0 - 255 to 0.0 - 1.0
