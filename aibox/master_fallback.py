@@ -165,12 +165,13 @@ def load_tracker(model_type, weights, device):
     return model
 
 
-def preprocess_detections(detections, im, im0, idx_shift, labels, count):
+def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
     # Rescale boxes from img_size to im0 size
     detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
 
-    for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
-                detections[-k-1][-1] = cls + idx_shift
+    if idx_shift is not None:
+        for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
+            detections[-k-1][-1] = cls + idx_shift
 
     # Print results
     for c in detections[:, 5].unique():
@@ -354,9 +355,9 @@ def run(
 
             # Pre-process detections
             if len(hand):
-                hand, s = preprocess_detections(hand, im, im0, index_add, master_label, s)
+                hand, s = preprocess_detections(hand, im, im0, master_label, s, index_add)
             if len(object):
-                object, s = preprocess_detections(object, im, im0, index_add, master_label, s)
+                object, s = preprocess_detections(object, im, im0, master_label, s)
 
             # Track hands and objects
             xywhs_hand = xyxy2xywh(hand[:, 0:4])
