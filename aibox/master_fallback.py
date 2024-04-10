@@ -25,20 +25,21 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort import StrongSORT
+from deep_sort_realtime.deepsort_tracker import DeepSort
 
 # Utility
 import keyboard
 from playsound import playsound
 import threading
 
-
+# Set relative path
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-# Yolov5 objects and their IDs
+# COCO labels dictionary
 obj_name_dict = {
 0: "person",
 1: "bicycle",
@@ -127,7 +128,6 @@ obj_name_dict = {
 # region Helpers
 
 def load_tracker(model_type, weights, device):
-    #model = deepSort() # add deepSORT as default/fallback tracker
     if model_type == 'strongsort':
         model = StrongSORT(
             model_weights=weights, 
@@ -139,9 +139,44 @@ def load_tracker(model_type, weights, device):
             n_init=3,              # Number of frames that a track remains in initialization phase
             nn_budget=100,         # Maximum size of the appearance descriptors gallery)
             mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
-            ema_alpha=0.9)         # updates  appearance  state in  an exponential moving average manner
+            ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
+            )         
+    else:
+        model = DeepSort(
+            max_iou_distance=0.7,
+            max_age=30,
+            n_init=3,
+            nms_max_overlap=1,
+            max_cosine_distance=0.2,
+            nn_budget=None,
+            gating_only_position=False,
+            override_track_class=None,
+            embedder="mobilenet",
+            half=True,
+            bgr=True,
+            embedder_gpu=True,
+            embedder_model_name=None,
+            embedder_wts=None,
+            polygon=False,
+            today= None
+        )
     return model
 
+
+def preprocess_detections(detections, im, im0, idx_shift, labels, count):
+    # Rescale boxes from img_size to im0 size
+    detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
+
+    for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
+                detections[-k-1][-1] = cls + idx_shift
+
+    # Print results
+    for c in detections[:, 5].unique():
+        n = (detections[:, 5] == c).sum()  # detections per class
+        count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
+    
+    return detections, count
+    
 
 def playstart():
     file = ROOT / f'resources/sound/beginning.mp3'
@@ -193,13 +228,11 @@ def run(
 
     if manual_entry == False:
         target_objs = ['cup','banana','potted plant','bicycle','apple','clock','wine glass']
-        #target_objs = ['wine glass']
         obj_index = 0
         gave_command = False
 
         print('The experiment will be run automatically. The selected target objects, in sequence, are:')
         print(target_objs)
-
     else:
         print('The experiment will be run manually. You will enter the desired target for each run yourself.')
     
@@ -210,6 +243,7 @@ def run(
         print('Cannot access selected source. Aborting.')
         sys.exit()
     
+    # Play welcome sound
     play_start()
 
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -234,6 +268,7 @@ def run(
 
     # Load tracker
     tracker = load_tracker(model_type='strongsort', weights=weights_tracker, device=device)
+    #tracker = load_tracker(model_type='deepsort', weights=weights_tracker, device=device)
 
     # Dataloader
     bs = 1  # batch_size
@@ -242,7 +277,7 @@ def run(
     bs = len(dataset)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
-    # Run inference
+    # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))  # warmup
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))  # warmup
     if hasattr(tracker, 'model'):
@@ -264,10 +299,18 @@ def run(
     curr_frames = None
     outputs = None
 
+    # Create combined label dictionary
+    index_add = len(names_obj)
+    labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
+    master_label = names_obj | labels_hand_adj
+
+    # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
 
+        # Start timer for fps measure
         start = time.perf_counter()
 
+        # Image pre-processing
         with dt[0]:
             image = torch.from_numpy(im).to(model_obj.device)
             image = image.half() if model_obj.fp16 else image.float()  # uint8 to fp16/32
@@ -285,10 +328,6 @@ def run(
         with dt[2]:
             pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
-
-        index_add = len(names_obj)
-        labels_hand_adj = {key + index_add: value for key, value in names_hand.items()}
-        master_label = names_obj|labels_hand_adj
 
         # Process predictions
         for i, (hand,object) in enumerate(itertools.zip_longest(pred_hand,pred_obj)):  # per image
@@ -311,52 +350,11 @@ def run(
                 if prev_frames is not None and curr_frames is not None:
                     tracker.tracker.camera_update(prev_frames, curr_frames)
 
+            # Pre-process detections
             if len(hand):
-
-                # Rescale boxes from img_size to im0 size
-                hand[:, :4] = scale_boxes(im.shape[2:], hand[:, :4], im0.shape).round()
-
-                for k, (*xyxy, conf, cls) in enumerate(reversed(hand)):
-                    hand[-k-1][-1] = cls + index_add
-
-                # Print results
-                for c in hand[:, 5].unique():
-                    n = (hand[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {master_label[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # Write results
-                for *xyxy, conf, cls in reversed(hand):
-                    # Collect bounding box information
-                    bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
-
-                    bboxs_hands.append({
-                        "class": int(cls),
-                        "label": master_label[int(cls)],
-                        "confidence": conf,
-                        "bbox": bbox
-                    })
-
-
+                hand, s = preprocess_detections(hand, im, im0, index_add, master_label, s)
             if len(object):
-                # Rescale boxes from img_size to im0 size
-                object[:, :4] = scale_boxes(im.shape[2:], object[:, :4], im0.shape).round()
-
-                # Print results
-                for c in object[:, 5].unique():
-                    n = (object[:, 5] == c).sum()  # detections per class
-                    s += f"{n} {master_label[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-                # Write results
-                for *xyxy, conf, cls in reversed(object):
-                    # Collect bounding box information
-                    bbox = xyxy2xywh(torch.tensor(xyxy).view(1, 4)).view(-1).tolist()
-
-                    bboxs_objs.append({
-                        "class": int(cls),
-                        "label": master_label[int(cls)],
-                        "confidence": conf,
-                        "bbox": bbox
-                    })
+                object, s = preprocess_detections(object, im, im0, index_add, master_label, s)
 
             # Track hands and objects
             xywhs_hand = xyxy2xywh(hand[:, 0:4])
@@ -406,7 +404,9 @@ def run(
                 cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
             cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
-            cv2.waitKey(1)  # 1 millisecond
+            #cv2.waitKey(1)  # 1 millisecond
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
         #Save results (image with detections)
             if save_img:
