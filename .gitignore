@@ -139,4 +139,22 @@ dmypy.json
 ## Git
 .DS_Store
 
-/aibox/runs
+
+# Project specific directories and files
+aibox/resources/datasets/
+aibox/resources/old_code/Testing/
+aibox/resources/fruithands.csv
+aibox/resources/hands_fp_raw.csv
+aibox/resources/object_detector_idea.pdf
+aibox/example_gpu.sh
+aibox/UOS_HPC_Guide.md
+flobox/experiment/analysis/Ramon/
+flobox/experiment/forms/
+flobox/experiment/plots/
+flobox/experiment/Abrechnung_VPgelder.pdf
+flobox/experiment/Data_Analysis.zip
+flobox/resources/Copenhagen/
+flobox/resources/OptiVisT_Retreat_Poster.pdf
+flobox/resources/OptiVisT_Workshop_Program.pdf
+flobox/resources/OptiVisT_Workshop_Timetable.pdf
+flobox/FloBox_Sensors_manuscript.pdf
