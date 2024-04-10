@@ -16,6 +16,15 @@ from pathlib import Path
 import itertools
 import time
 
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+
+sys.path.append(str(ROOT) + '/yolov5')
+
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
 # Object tracking
 import torch
 from yolov5.models.common import DetectMultiBackend
@@ -30,13 +39,6 @@ from strongsort import StrongSORT
 import keyboard
 from playsound import playsound
 import threading
-
-
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]  # YOLOv5 root directory
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 # Yolov5 objects and their IDs
 obj_name_dict = {
