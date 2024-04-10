@@ -16,6 +16,15 @@ from pathlib import Path
 import itertools
 import time
 
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+
+sys.path.append(str(ROOT) + '/yolov5')
+
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
 # Object tracking
 import torch
 from yolov5.models.common import DetectMultiBackend
@@ -31,13 +40,6 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 import keyboard
 from playsound import playsound
 import threading
-
-# Set relative path
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]  # YOLOv5 root directory
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 # COCO labels dictionary
 obj_name_dict = {
