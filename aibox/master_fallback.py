@@ -33,7 +33,7 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
                            increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
-from strongsort import StrongSORT
+from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
 # Utility
