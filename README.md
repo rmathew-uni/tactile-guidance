@@ -38,3 +38,23 @@ You do not need all the YOLOv5 files, just the following:
 - export.py
 
 If you clone this repo, YOLOv5 is already set up properly and you only need to separately install the YOLOv8 packages into your environment.
+
+
+### Exporting models for use with the NLInterface Android App
+
+These models can be used in the Android app developed during the study project "Making blind people grasp" in 2023/2024 lead by Peter König.
+The script for that is located in `aibox/app_export.py` and works for the hand detection as well as object detection.
+
+To export the hand detection model, first export it as a tensorflow saved model using the default export script.
+
+```bash
+$ cd aibox
+$ python export.py --weights hand.pt --include saved_model --keras
+```
+This will create the `hand_saved_model` directory.
+
+After that you can convert it for the Tensorflow-Lite Runtime using
+
+```bash
+$ python app_export.py --hands hand_saved_model --output hands.tflite
+```
