@@ -3,12 +3,9 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption)
-
 from auto_connect import interactive_belt_connect, setup_logger
-
 import threading
 import sys
-
 from pynput.keyboard import Key, Listener
 
 
@@ -43,6 +40,8 @@ def connect_belt():
 
 def navigate_hand(
         belt_controller, 
+        framewidth,
+        frameheight,
         bboxes, 
         search_key_obj: str, 
         search_key_hand: list, 
@@ -65,6 +64,9 @@ def navigate_hand(
     • hor_correct - boolean representing whether hand and object are assumed to be aligned horizontally; by default False
     • ver_correct - boolean representing whether hand and object are assumed to be aligned vertically; by default False
     • grasp - boolean representing whether grasp command has been sent; by default False
+    • x_threshold - 
+    • y_threshold - 
+    
     Output:
     • horizontal - boolean representing whether hand and object are aligned horizontally after execution of the function; by default False
     • vertical - boolean representing whether hand and object are aligned vertically after execution of the function; by default False
@@ -124,10 +126,11 @@ def navigate_hand(
     max_hand_confidence = 0
     max_obj_confidence = 0
     hand, target = None, None
-    # Difference between the hand xy and object xy
-    x_threshold = 50
-    y_threshold = 50
     horizontal, vertical = False, False
+    x_threshold = 100
+    y_threshold = 100
+    x_scalar = 15
+    y_scalar = 15
 
     termination_signal = start_listener()
 
@@ -152,16 +155,17 @@ def navigate_hand(
             max_obj_confidence = bbox[6]
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
-    if hand != None:
+    if hand is not None:
         x_center_hand, y_center_hand = hand[0], hand[1]
-        y_center_hand = y_center_hand - (hand[3]/2) # adjusted height of the hand BB
+        # move the y_center of the hand in the direction of the fingertips to help avoid occlusions (testing)
+        y_center_hand = y_center_hand - ((hand[3]/2)//4)
 
-    if target != None:
+    if target is not None:
         x_center_obj, y_center_obj = target[0], target[1]
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
-    if hand != None and hor_correct and ver_correct:
+    if hand is not None and hor_correct and ver_correct:
         obj_seen_prev = False
         search = False
         count_searching = 0
@@ -204,7 +208,7 @@ def navigate_hand(
 
 
     # 2. Guidance: If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
-    if hand != None and target != None:
+    if hand is not None and target is not None:
         obj_seen_prev = False
         search = False
         count_searching = 0
@@ -221,13 +225,14 @@ def navigate_hand(
 
         # Horizontal movement logic
         # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
+        x_epsilon = (target[2]-target[0])//2 + (hand[2]-hand[0])//2
         if abs(x_center_hand - x_center_obj) > x_threshold:
             horizontal = False
-            if x_center_hand < x_center_obj:
+            if x_center_hand < x_center_obj - x_epsilon:
                 print('right')
                 #if not mock_belt:
                 belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
-            elif x_center_hand > x_center_obj:
+            elif x_center_hand > x_center_obj + x_epsilon:
                 print('left')
                 #if not mock_belt:
                 belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
@@ -240,13 +245,14 @@ def navigate_hand(
         # Vertical movement logic
         # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
         if horizontal == True:
+            y_epsilon = (target[3]-target[1])//2 + (hand[3]-hand[1])//2
             if abs(y_center_hand - y_center_obj) > y_threshold:
                 vertical = False
-                if y_center_hand < y_center_obj:
+                if y_center_hand < y_center_obj - y_epsilon:
                     print('down')
                     #if not mock_belt:
                     belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
-                elif y_center_hand > y_center_obj:
+                elif y_center_hand > y_center_obj + y_epsilon:
                     print('up')
                     #if not mock_belt:
                     belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
@@ -260,7 +266,7 @@ def navigate_hand(
 
 
     # 3. Lost target: If the camera cannot see the hand or the object, tell them they need to move around
-    if target == None and grasp == False:
+    if target is None and grasp == False:
         if obj_seen_prev == True:
             jitter_guard = 0 
             obj_seen_prev = False
@@ -299,7 +305,7 @@ def navigate_hand(
 
 
     # 4. Lost hand: If the camera cannot see the hand but the object is visible, tell them to move the hand around
-    if target != None:
+    if target is not None:
 
         if search == True:
             jitter_guard = 0

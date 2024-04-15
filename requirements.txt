@@ -3,6 +3,4 @@ keyboard==0.13.5
 playsound==1.3.0
 pybelt==1.0.5
 pynput==1.7.6
-strongsort
-torchreid
 deep-sort-realtime

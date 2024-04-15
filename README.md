@@ -38,3 +38,4 @@ You do not need all the YOLOv5 files, just the following:
 - export.py
 
 If you clone this repo, YOLOv5 is already set up properly and you only need to separately install the YOLOv8 packages into your environment.
+To run the master.py file, change directory into the aibox folder before executing the code (pathing issue).
