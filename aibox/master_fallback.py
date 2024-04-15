@@ -36,6 +36,9 @@ from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
+# Navigation
+from bracelet import navigate_hand, connect_belt
+
 # Utility
 import keyboard
 from playsound import playsound
@@ -274,6 +277,16 @@ def run(
         print('Cannot access selected source. Aborting.')
         sys.exit()
 
+    """
+    # Check bracelet connection
+    connection_check, belt_controller = connect_belt()
+    if connection_check:
+        print('Bracelet connection successful.')
+    else:
+        print('Error connecting bracelet. Aborting.')
+        sys.exit()
+    """
+
     # Experiment setup
     if manual_entry == False:
         target_objs = ['cup','banana','potted plant','bicycle','apple','clock','wine glass']
@@ -339,7 +352,7 @@ def run(
     outputs = None
     bboxs_hands = []  
     bboxs_objs = []
-    bboxs = []
+    bboxes = []
 
     # endregion
 
@@ -429,21 +442,11 @@ def run(
                 else:
                     print('Tracker was not correctly initialized.')
 
-                # Write results
+                # Write results to annotator (visualization)
                 for *xywh, obj_id, cls, conf in outputs:
-                    #print(f'Detections:\n{outputs}')
-                    # Collect bounding box information
                     bbox = xywh
                     id = int(obj_id)
-                    c = int(cls)  # integer class
-
-                    bboxs.append({
-                        "class": c,
-                        "label": master_label[c],
-                        "confidence": conf,
-                        "id": id,
-                        "bbox": bbox
-                    })
+                    c = int(cls)
 
                     # add BBs to annotator here
                     if save_img or save_crop or view_img:  # Add bbox to image
@@ -458,6 +461,7 @@ def run(
             runtime = end - start
             fps = 1 / runtime
             prev_frames = curr_frames
+            # Save (running mean) FPS
 
         # Stream results
         im0 = annotator.result()
@@ -495,6 +499,7 @@ def run(
 
         # endregion
 
+
         # region main navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
         if manual_entry == True:
@@ -509,6 +514,7 @@ def run(
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
                         playsound(str(file))
+                        # Start trial time measure (end in navigate_hand(...))
                     else:
                         print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
 
@@ -523,23 +529,17 @@ def run(
                 pass
 
             # Navigate the hand based on information from last frame and current frame detections
-            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller, outputs, target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
                 target_entered = False
-
-            #horizontal_in, vertical_in = False, False
 
             # Set values of the inputs for the next loop iteration
             if horizontal_out:
                 horizontal_in = True
             if vertical_out:
                 vertical_in = True
-
-            # Clear bbox_info after applying navigation logic for the current frame
-            bboxs_hands = []
-            bboxs_objs = []
 
         else:
             target_obj_verb = target_objs[obj_index]
@@ -555,7 +555,7 @@ def run(
                 count_searching, count_see_object, jitter_guard = 0,0,0
 
             # Navigate the hand based on information from last frame and current frame detections
-            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller,bboxs_hands,bboxs_objs,target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = navigate_hand(belt_controller, outputs, target_obj_verb, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
@@ -571,17 +571,11 @@ def run(
             if horizontal_out and vertical_out and grasp:
                 target_entered = False
 
-            #horizontal_in, vertical_in = False, False
-
             # Set values of the inputs for the next loop iteration
             if horizontal_out:
                 horizontal_in = True
             if vertical_out:
                 vertical_in = True
-
-            # Clear bbox_info after applying navigation logic for the current frame
-            bboxs_hands = []
-            bboxs_objs = []
         
         # endregion
 

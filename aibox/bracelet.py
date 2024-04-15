@@ -40,12 +40,26 @@ def connect_belt():
         belt_controller.set_belt_mode(BeltMode.APP_MODE)
         return True, belt_controller
 
-def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, search_key_hand: list, hor_correct: bool = False, ver_correct: bool = False, grasp: bool = False, obj_seen_prev: bool = False, search: bool = False, count_searching: int = 0, count_see_object: int = 0, jitter_guard: int=0, navigating: bool = False):
+
+def navigate_hand(
+        belt_controller, 
+        bboxes, 
+        search_key_obj: str, 
+        search_key_hand: list, 
+        hor_correct: bool = False, 
+        ver_correct: bool = False, 
+        grasp: bool = False, 
+        obj_seen_prev: bool = False, 
+        search: bool = False, 
+        count_searching: int = 0, 
+        count_see_object: int = 0, 
+        jitter_guard: int=0, 
+        navigating: bool = False):
     
     '''
     Function that navigates the hand to the target object. Handles cases when either hand or target is not detected
     Input:
-    • bbox_info - structure containing following information about each prediction: "class","label","confidence","bbox"
+    • bboxes - list containing following information about each prediction: 0-3: bbox xywh, 4: trackID, 5: class, 6: confidence
     • search_key_obj - integer representing target object class
     • search_key_hand - list of integers containing hand detection classes used for navigation
     • hor_correct - boolean representing whether hand and object are assumed to be aligned horizontally; by default False
@@ -58,23 +72,14 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
     • check
     • check_dur
     '''
-    global mock_belt, one_round
 
-    horizontal, vertical = False, False
+    # Belt vars
+    global mock_belt
 
-    max_hand_confidence = 0
-    max_obj_confidence = 0
-    
-    # Diffrence between the hand xy and object xy
-    x_threshold = 50
-    y_threshold = 50
-
+    # Threading vars
     global termination_signal 
+    global one_round
     termination_signal = False
-    
-    #print(bbox_info)
-
-    bbox_hand, bbox_obj = None, None
 
     def abort(key):
         # Check if the pressed key is the left clicker key    
@@ -114,6 +119,16 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
         
         return termination_signal
 
+
+    # Navigation vars
+    max_hand_confidence = 0
+    max_obj_confidence = 0
+    hand, target = None, None
+    # Difference between the hand xy and object xy
+    x_threshold = 50
+    y_threshold = 50
+    horizontal, vertical = False, False
+
     termination_signal = start_listener()
 
     if termination_signal:
@@ -122,34 +137,31 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
         sys.exit()
 
     # Search for object and hand with the highest prediction confidence
-    for bbox in bboxs_hands:
-        if bbox["class"] in search_key_hand and bbox["confidence"] > max_hand_confidence:
-            bbox_hand = bbox.get("bbox")
-            max_hand_confidence = bbox["confidence"]
-            #print(f"hand confidence: {bbox['confidence']} \n")
+    # Filter for hand detections
+    bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
+    for bbox in bboxes_hands:
+        if bbox[6] > max_hand_confidence:
+            hand = bbox[0:4]
+            max_hand_confidence = bbox[6]
 
-    for bbox in bboxs_objs:
-        if bbox["label"] == search_key_obj and bbox["confidence"] > max_obj_confidence:
-            #print(f"label: {bbox['label']}")
-            bbox_obj = bbox.get("bbox")
-            max_obj_confidence = bbox["confidence"]
-            #print(f"obj confidence: {bbox['confidence']} \n")
+    # Filter for target detections
+    bboxes_objects = [detection for detection in bboxes if detection[5] == search_key_obj]
+    for bbox in bboxes_objects:
+        if bbox[6] > max_obj_confidence:
+            target = bbox[0:4]
+            max_obj_confidence = bbox[6]
 
-    # Getting horizontal and vertical position of the bounding box around tbarget object and hand
-    if bbox_hand != None:
+    # Getting horizontal and vertical position of the bounding box around target object and hand
+    if hand != None:
+        x_center_hand, y_center_hand = hand[0], hand[1]
+        y_center_hand = y_center_hand - (hand[3]/2) # adjusted height of the hand BB
 
-        x_center_hand, y_center_hand = bbox_hand[0], bbox_hand[1]
-        y_center_hand = y_center_hand - (bbox_hand[3]/2)
-
-    if bbox_obj != None:
-
-        x_center_obj, y_center_obj = bbox_obj[0], bbox_obj[1]
+    if target != None:
+        x_center_obj, y_center_obj = target[0], target[1]
  
-    # Hand is detected, object is not detected, and they are aligned horizontally and vertically - send grasp command
-    # Assumption: occlusion of the object by hand
 
-    if bbox_hand != None and hor_correct and ver_correct:
-
+    # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
+    if hand != None and hor_correct and ver_correct:
         obj_seen_prev = False
         search = False
         count_searching = 0
@@ -177,20 +189,22 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                         exclusive_channel=False,
                         clear_other_channels=False
                     )
-
-        print('Please use the clicker to indicate you have grasped the object')
+        
+        # End guidance RT measure
+        print('Please use the clicker to indicate you have grasped the object.')
 
         # listen for clicker
         with Listener(on_press=on_click) as listener:
+            # End trial time measure
             listener.join()
 
         grasp = True
 
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
-    
-    # If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
-    if bbox_hand != None and bbox_obj != None:
 
+
+    # 2. Guidance: If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
+    if hand != None and target != None:
         obj_seen_prev = False
         search = False
         count_searching = 0
@@ -202,6 +216,8 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         if navigating == False:
             belt_controller.stop_vibration()
+
+        # Start guidance RT measure
 
         # Horizontal movement logic
         # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
@@ -220,7 +236,6 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         else:
             horizontal = True
-
 
         # Vertical movement logic
         # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
@@ -243,25 +258,21 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
 
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
-    # if the camera cannot see the hand or the object, tell them they need to move around
-    if bbox_obj == None and grasp == False:
 
+    # 3. Lost target: If the camera cannot see the hand or the object, tell them they need to move around
+    if target == None and grasp == False:
         if obj_seen_prev == True:
             jitter_guard = 0 
             obj_seen_prev = False
         
         jitter_guard += 1
-
         if jitter_guard >= 40:
-        
             count_see_object = 0 
             navigating = False
 
             #if not mock_belt:
             if search == False:
-
                     belt_controller.stop_vibration()
-
                     #left
                     belt_controller.send_pulse_command(
                                 channel_index=0,
@@ -277,35 +288,30 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                                 exclusive_channel=False,
                                 clear_other_channels=False
                             )
-                
                     search = True
-                
-            count_searching += 1
 
+            count_searching += 1
             if count_searching >= 150:
                 search = False
                 count_searching = 0
             
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
-        
-    # if the camera cannot see the hand but the object is visible, tell them to move the hand around
-    if bbox_obj != None:
+
+
+    # 4. Lost hand: If the camera cannot see the hand but the object is visible, tell them to move the hand around
+    if target != None:
 
         if search == True:
             jitter_guard = 0
             search = False
 
         jitter_guard += 1
-
-        if jitter_guard >= 40:
-            
+        if jitter_guard >= 40: 
             navigating = False
             count_searching = 0
             
             if obj_seen_prev == False:
-
                 belt_controller.stop_vibration()
-
                 #down
                 belt_controller.send_pulse_command(
                             channel_index=0,
@@ -321,11 +327,9 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
                             exclusive_channel=False,
                             clear_other_channels=False
                         )
-                
                 obj_seen_prev = True
-            
-            count_see_object += 1
 
+            count_see_object += 1
             if count_see_object >= 150:
                 obj_seen_prev = False
                 count_see_object = 0
@@ -333,9 +337,5 @@ def navigate_hand(belt_controller,bboxs_hands,bboxs_objs, search_key_obj: str, s
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
     else:
-
         print('Condition not covered by logic. Maintaining variables and standing by.')
-
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
-
-    
