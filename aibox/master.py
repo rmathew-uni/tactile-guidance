@@ -169,6 +169,13 @@ def load_tracker(model_type, weights, device):
     return model
 
 
+def preprocess_image(im):
+    # Resizing to Hx640 (training on 640x640 images)
+    aspect_ratio = im.shape[1] / im.shape[0] # width / height
+    im = cv2.resize(im, dsize=(640, int(640/aspect_ratio))) # width, height
+    return im
+
+
 def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
     # Rescale boxes from img_size to im0 size
     detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
@@ -394,6 +401,9 @@ def run(
 
             # i always equals 0 (per frame there is just one prediction object, because just one source)
             p, im0, frame = path[i], im0s[i].copy(), dataset.count
+            print(im0.shape)
+            im0 = preprocess_image(im0) # Reshape image to match training image size Hx640 - yes or no?
+            print(im0.shape)
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
@@ -460,10 +470,10 @@ def run(
         # Stream results
         im0 = annotator.result()
         if view_img:
-            cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
+            #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
             cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
-            cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
+            #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -550,6 +560,7 @@ def run(
                 obj_seen_prev, search, navigating = False, False, False
                 count_searching, count_see_object, jitter_guard = 0,0,0
 
+            #print(im0.shape[1], im0.shape[0])
             # Navigate the hand based on information from last frame and current frame detections
             horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
                 navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)

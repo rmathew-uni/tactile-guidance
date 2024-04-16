@@ -102,10 +102,10 @@ def navigate_hand(
     def start_listener():
 
         global termination_signal, one_round
-        existing_thead = threading.enumerate()
+        existing_thread = threading.enumerate()
         listener_thread = None
 
-        for thread in existing_thead:
+        for thread in existing_thread:
             if thread.name == 'clicker':
                 listener_thread = thread
                 termination_signal = False
