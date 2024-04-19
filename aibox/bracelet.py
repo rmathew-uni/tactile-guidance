@@ -39,9 +39,7 @@ def connect_belt():
 
 
 def navigate_hand(
-        belt_controller, 
-        framewidth,
-        frameheight,
+        belt_controller,
         bboxes, 
         search_key_obj: str, 
         search_key_hand: list, 
@@ -156,17 +154,19 @@ def navigate_hand(
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
+        print(hand)
         x_center_hand, y_center_hand = hand[0], hand[1]
         # move the y_center of the hand in the direction of the fingertips to help avoid occlusions (testing)
         y_center_hand = y_center_hand - ((hand[3]/2)//4)
 
     if target is not None:
         x_center_obj, y_center_obj = target[0], target[1]
-        target_right_bound, target_lower_bound = target[2], target[3] # width, height
-        target_left_bound = target_right_bound - 2 * (target_right_bound-x_center_obj)
-        target_upper_bound = target_lower_bound - 2 * (target_lower_bound-y_center_obj)
-        print(f'Left and right bound: {target_left_bound, target_right_bound}')
-        print(f'Upper and lower bound: {target_upper_bound, target_lower_bound}')
+        target_width = target[2]
+        target_height = target[3]
+        target_left_bound = target[0] - target_width//2
+        target_right_bound = target[0] + target_width//2
+        target_lower_bound = target[1] + target_height//2
+        target_upper_bound = target[1] - target_height//2
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
@@ -349,9 +349,8 @@ def navigate_hand(
         print('Condition not covered by logic. Maintaining variables and standing by.')
         return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
+
 def mock_navigate_hand(
-        framewidth,
-        frameheight,
         bboxes, 
         search_key_obj: str, 
         search_key_hand: list, 
@@ -391,13 +390,13 @@ def mock_navigate_hand(
     termination_signal = False
 
     def abort(key):
-        # Check if the pressed key is the left clicker key    
-        if key == Key.page_up:
+        # Check if the pressed key is the left clicker key
+        if key == Key.esc:
             sys.exit()
 
     def on_click(key):
         # Check if the pressed key is the right clicker key
-        if key == Key.page_down:
+        if key == Key.enter:
             return False
 
     def listener():
@@ -434,10 +433,6 @@ def mock_navigate_hand(
     max_obj_confidence = 0
     hand, target = None, None
     horizontal, vertical = False, False
-    x_threshold = 100
-    y_threshold = 100
-    x_scalar = 15
-    y_scalar = 15
 
     # Search for object and hand with the highest prediction confidence
     # Filter for hand detections
@@ -456,15 +451,20 @@ def mock_navigate_hand(
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
+        #print(f'hand {hand}')
         x_center_hand, y_center_hand = hand[0], hand[1]
         # move the y_center of the hand in the direction of the fingertips to help avoid occlusions (testing)
-        y_center_hand = y_center_hand - ((hand[3]/2)//4)
+        hand_upper_bound = y_center_hand - hand[3]//2
+        hand_lower_bound = y_center_hand + hand[3]//2
 
     if target is not None:
-        x_center_obj, y_center_obj = target[0], target[1]
-        target_right_bound, target_lower_bound = target[2], target[3] # width, height
-        target_left_bound = target_right_bound - 2 * (target_right_bound-x_center_obj)
-        target_upper_bound = target_lower_bound - 2 * (target_lower_bound-y_center_obj)
+        #print(f'target {target}')
+        target_width = target[2]
+        target_height = target[3]
+        target_left_bound = target[0] - target_width//2
+        target_right_bound = target[0] + target_width//2
+        target_lower_bound = target[1] + target_height//2
+        target_upper_bound = target[1] - target_height//2
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
@@ -498,35 +498,32 @@ def mock_navigate_hand(
         count_searching = 0
         count_see_object = 0
         jitter_guard = 0
+        threshold = 20 * target[2] / hand[2] 
 
         # Start guidance RT measure
 
         # Horizontal movement logic
         # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
-        if abs(x_center_hand - x_center_obj) > x_threshold:
-            horizontal = False
-            if x_center_hand < target_left_bound:
-                print('right')
-            elif x_center_hand > target_right_bound:
-                print('left')
-            
+        horizontal = False
+        if x_center_hand < target_left_bound:
+            print('right')
             navigating = True
-
+        elif x_center_hand > target_right_bound:
+            print('left')
+            navigating = True
         else:
             horizontal = True
 
         # Vertical movement logic
         # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
         if horizontal == True:
-            if abs(y_center_hand - y_center_obj) > y_threshold:
-                vertical = False
-                if y_center_hand < target_upper_bound:
-                    print('down')
-                elif y_center_hand > target_lower_bound:
-                    print('up')
-
+            vertical = False
+            if hand_lower_bound < target_upper_bound: # - threshold: # dynamic grasp triggering
+                print('down')
                 navigating = True
-                    
+            elif hand_upper_bound > target_lower_bound: # + threshold:
+                print('up')
+                navigating = True
             else:
                 vertical = True
 
