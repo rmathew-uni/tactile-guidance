@@ -165,6 +165,8 @@ def navigate_hand(
         target_right_bound, target_lower_bound = target[2], target[3] # width, height
         target_left_bound = target_right_bound - 2 * (target_right_bound-x_center_obj)
         target_upper_bound = target_lower_bound - 2 * (target_lower_bound-y_center_obj)
+        print(f'Left and right bound: {target_left_bound, target_right_bound}')
+        print(f'Upper and lower bound: {target_upper_bound, target_lower_bound}')
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
