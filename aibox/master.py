@@ -24,6 +24,7 @@ sys.path.append(str(ROOT) + '/yolov5')
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+os.chdir(ROOT) # change path to ROOT
 
 # Object tracking
 import torch
@@ -37,7 +38,7 @@ from strongsort.strong_sort import StrongSORT # there is also a pip install, but
 from deep_sort_realtime.deepsort_tracker import DeepSort
 
 # Navigation
-from bracelet import navigate_hand, connect_belt
+from bracelet import navigate_hand, mock_navigate_hand, connect_belt
 
 # Utility
 import keyboard
@@ -285,7 +286,8 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
-        manual_entry=False # True means you will control the exp manually versus the standard automatic running
+        manual_entry=False, # True means you will control the exp manually versus the standard automatic running
+        mock_navigate=True # True means that navigation will be conducted only via print commands without connecting the bracelet
 ):
 
     # region main setup
@@ -298,12 +300,13 @@ def run(
         sys.exit()
 
     # Check bracelet connection
-    connection_check, belt_controller = connect_belt()
-    if connection_check:
-        print('Bracelet connection successful.')
-    else:
-        print('Error connecting bracelet. Aborting.')
-        sys.exit()
+    if not mock_navigate:
+        connection_check, belt_controller = connect_belt()
+        if connection_check:
+            print('Bracelet connection successful.')
+        else:
+            print('Error connecting bracelet. Aborting.')
+            sys.exit()
 
     # Experiment setup
     if manual_entry == False:
@@ -515,7 +518,7 @@ def run(
                     if target_obj_verb in obj_name_dict.values():
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
-                        file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
+                        file = ROOT / f'/resources/sound/{target_obj_verb}.mp3'
                         playsound(str(file))
                         # Start trial time measure (end in navigate_hand(...))
                     else:
@@ -532,9 +535,12 @@ def run(
                 pass
 
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
-
+            if not mock_navigate:
+                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+            else:
+                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                    mock_navigate_hand(im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
                 target_entered = False
@@ -550,7 +556,7 @@ def run(
             class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
 
             if gave_command == False:
-                file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
+                file = ROOT / f'/resources/sound/{target_obj_verb}.mp3'
                 playsound(str(file))
                 grasp = False
                 horizontal_in, horizontal_out = False, False
@@ -560,15 +566,19 @@ def run(
                 count_searching, count_see_object, jitter_guard = 0,0,0
 
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            if not mock_navigate:
+                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+            else:
+                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                    mock_navigate_hand(im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
                 obj_index += 1
 
             if obj_index == len(target_objs):
-                file = ROOT / f'resources/sound/ending.mp3'
+                file = ROOT / f'/resources/sound/ending.mp3'
                 playsound(str(file))
                 print('Experiment Completed')
                 break
@@ -596,6 +606,7 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    mock_navigate = True # Navigate without the bracelet using only print commands
 
-    run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source)
+    run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate)
