@@ -58,3 +58,4 @@ After that you can convert it for the Tensorflow-Lite Runtime using
 ```bash
 $ python app_export.py --hands hand_saved_model --output hands.tflite
 ```
+To run the master.py file, change directory into the aibox folder before executing the code (pathing issue).
