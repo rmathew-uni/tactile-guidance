@@ -132,6 +132,52 @@ obj_name_dict = {
 
 # region Helpers
 
+def playstart():
+    file = ROOT / f'resources/sound/beginning.mp3'
+    playsound(str(file))
+
+
+def play_start():
+    play_start_thread = threading.Thread(target=playstart, name='play_start')
+    play_start_thread.start()
+
+
+def hist_equalization(im):
+    im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
+    im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
+    #configure CLAHE
+    clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
+    #0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
+    im[:,:,0] = clahe.apply(im[:,:,0])
+    im = cv2.cvtColor(im, cv2.COLOR_Lab2RGB)
+    im = np.transpose(im, (2,0,1))
+    im = np.expand_dims(im, axis=0)
+    return im
+
+
+def resize_image(im):
+    # Resizing to Hx640 (training on 640x640 images)
+    aspect_ratio = im.shape[1] / im.shape[0] # width / height
+    im = cv2.resize(im, dsize=(640, int(640/aspect_ratio))) # width, height
+    return im
+
+
+def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
+    # Rescale boxes from img_size to im0 size
+    detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
+
+    if idx_shift is not None:
+        for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
+            detections[-k-1][-1] = cls + idx_shift
+
+    # Print results
+    for c in detections[:, 5].unique():
+        n = (detections[:, 5] == c).sum()  # detections per class
+        count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
+    
+    return detections, count
+
+
 def load_tracker(model_type, weights, device):
     if model_type == 'strongsort':
         model = StrongSORT(
@@ -169,29 +215,6 @@ def load_tracker(model_type, weights, device):
     return model
 
 
-def preprocess_image(im):
-    # Resizing to Hx640 (training on 640x640 images)
-    aspect_ratio = im.shape[1] / im.shape[0] # width / height
-    im = cv2.resize(im, dsize=(640, int(640/aspect_ratio))) # width, height
-    return im
-
-
-def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
-    # Rescale boxes from img_size to im0 size
-    detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
-
-    if idx_shift is not None:
-        for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
-            detections[-k-1][-1] = cls + idx_shift
-
-    # Print results
-    for c in detections[:, 5].unique():
-        n = (detections[:, 5] == c).sum()  # detections per class
-        count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
-    
-    return detections, count
-
-
 def update_deepsort(tracker, xywhs, confs, clss, frame):
     # Convert tensors to Python lists
     xywhs_list = xywhs.tolist()
@@ -225,16 +248,6 @@ def update_deepsort(tracker, xywhs, confs, clss, frame):
     
     # Currently does not work, detections for "lost" tracks are saved, but confidence is NoneType
     return outputs
-
-
-def playstart():
-    file = ROOT / f'resources/sound/beginning.mp3'
-    playsound(str(file))
-
-
-def play_start():
-    play_start_thread = threading.Thread(target=playstart, name='play_start')
-    play_start_thread.start()
 
 # endregion
 
@@ -284,6 +297,7 @@ def run(
         print('Cannot access selected source. Aborting.')
         sys.exit()
 
+    """
     # Check bracelet connection
     connection_check, belt_controller = connect_belt()
     if connection_check:
@@ -291,6 +305,7 @@ def run(
     else:
         print('Error connecting bracelet. Aborting.')
         sys.exit()
+    """
 
     # Experiment setup
     if manual_entry == False:
@@ -366,17 +381,6 @@ def run(
 
         # Image pre-processing
         with dt[0]:
-            '''
-            im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
-            im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
-            #configure CLAHE
-            clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
-            #0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
-            im[:,:,0] = clahe.apply(im[:,:,0])
-            im = cv2.cvtColor(im, cv2.COLOR_Lab2RGB)
-            im = np.transpose(im, (2,0,1))
-            im = np.expand_dims(im, axis=0)
-            '''
             image = torch.from_numpy(im).to(model_obj.device)
             image = image.half() if model_obj.fp16 else image.float()  # uint8 to fp16/32
             image /= 255  # 0 - 255 to 0.0 - 1.0
@@ -401,9 +405,6 @@ def run(
 
             # i always equals 0 (per frame there is just one prediction object, because just one source)
             p, im0, frame = path[i], im0s[i].copy(), dataset.count
-            print(im0.shape)
-            im0 = preprocess_image(im0) # Reshape image to match training image size Hx640 - yes or no?
-            print(im0.shape)
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
@@ -533,8 +534,8 @@ def run(
                 pass
 
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+            #    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
@@ -562,8 +563,8 @@ def run(
 
             #print(im0.shape[1], im0.shape[0])
             # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+            #    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
@@ -598,6 +599,6 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
 
     run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source)

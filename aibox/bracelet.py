@@ -162,6 +162,9 @@ def navigate_hand(
 
     if target is not None:
         x_center_obj, y_center_obj = target[0], target[1]
+        target_right_bound, target_lower_bound = target[2], target[3] # width, height
+        target_left_bound = target_right_bound - 2 * (target_right_bound-x_center_obj)
+        target_upper_bound = target_lower_bound - 2 * (target_lower_bound-y_center_obj)
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
@@ -225,14 +228,13 @@ def navigate_hand(
 
         # Horizontal movement logic
         # Centers of the hand and object bounding boxes further away than x_threshold - move hand horizontally
-        x_epsilon = (target[2]-target[0])//2 + (hand[2]-hand[0])//2
         if abs(x_center_hand - x_center_obj) > x_threshold:
             horizontal = False
-            if x_center_hand < x_center_obj - x_epsilon:
+            if x_center_hand < target_left_bound:
                 print('right')
                 #if not mock_belt:
                 belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
-            elif x_center_hand > x_center_obj + x_epsilon:
+            elif x_center_hand > target_right_bound:
                 print('left')
                 #if not mock_belt:
                 belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
@@ -245,14 +247,13 @@ def navigate_hand(
         # Vertical movement logic
         # Centers of the hand and object bounding boxes further away than y_threshold - move hand vertically
         if horizontal == True:
-            y_epsilon = (target[3]-target[1])//2 + (hand[3]-hand[1])//2
             if abs(y_center_hand - y_center_obj) > y_threshold:
                 vertical = False
-                if y_center_hand < y_center_obj - y_epsilon:
+                if y_center_hand < target_upper_bound:
                     print('down')
                     #if not mock_belt:
                     belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
-                elif y_center_hand > y_center_obj + y_epsilon:
+                elif y_center_hand > target_lower_bound:
                     print('up')
                     #if not mock_belt:
                     belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)
