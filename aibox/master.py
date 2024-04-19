@@ -297,7 +297,6 @@ def run(
         print('Cannot access selected source. Aborting.')
         sys.exit()
 
-    """
     # Check bracelet connection
     connection_check, belt_controller = connect_belt()
     if connection_check:
@@ -305,7 +304,6 @@ def run(
     else:
         print('Error connecting bracelet. Aborting.')
         sys.exit()
-    """
 
     # Experiment setup
     if manual_entry == False:
@@ -534,8 +532,8 @@ def run(
                 pass
 
             # Navigate the hand based on information from last frame and current frame detections
-            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-            #    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
@@ -561,10 +559,9 @@ def run(
                 obj_seen_prev, search, navigating = False, False, False
                 count_searching, count_see_object, jitter_guard = 0,0,0
 
-            #print(im0.shape[1], im0.shape[0])
             # Navigate the hand based on information from last frame and current frame detections
-            #horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-            #    navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+                navigate_hand(belt_controller, im0.shape[1], im0.shape[0], outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard,navigating)
 
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
@@ -599,6 +596,6 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
 
     run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source)
