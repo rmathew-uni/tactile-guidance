@@ -357,7 +357,17 @@ def run(
     # Dataloader
     bs = 1  # batch_size
     view_img = check_imshow(warn=True)
-    dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
+    try:
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
+    except AssertionError:
+        while True:
+            change_camera = input(f'Failed to open camera with index {source}. Do you want to continue with webcam? (Y/N)')
+            if change_camera == 'Y':
+                source = '0'
+                dataset = LoadStreams(source, img_size=imgsz, stride=stride_obj, auto=True, vid_stride=vid_stride)
+                break
+            elif change_camera == 'N':
+                exit()
     bs = len(dataset)
     vid_path, vid_writer = [None] * bs, [None] * bs
 
