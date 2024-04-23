@@ -320,7 +320,7 @@ def run(
     # Experiment setup
     if manual_entry == False:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['apple' for i in range(20)] # debugging
+        target_objs = ['bottle' for i in range(5)] # debugging
         obj_index = 0
         gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
@@ -575,10 +575,10 @@ def run(
                 vertical_in = True
 
         else:
-            target_obj_verb = target_objs[obj_index]
-            class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
 
             if gave_command == False:
+                target_obj_verb = target_objs[obj_index]
+                class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
                 file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
                 #playsound(str(file))
                 grasp = False
@@ -587,17 +587,19 @@ def run(
                 gave_command = True
                 obj_seen_prev, search, navigating = False, False, False
                 count_searching, count_see_object, jitter_guard = 0,0,0
+                curr_obj_track_id, curr_hand_track_id = -1,-1
 
             # Navigate the hand based on information from last frame and current frame detections
             if not mock_navigate:
                 horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
                     navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             else:
-                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id = \
+                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
 
+            # Exit the loop if grasp signal was sent and set index of the next element from the list
             if grasp and ((obj_index+1)<=len(target_objs)):
-                #gave_command = False
+                gave_command = False
                 obj_index += 1
 
             if obj_index == len(target_objs):
@@ -607,8 +609,8 @@ def run(
                 break
 
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-            if horizontal_out and vertical_out and grasp:
-                gave_command = False
+            #if horizontal_out and vertical_out and grasp:
+            #    gave_command = False
 
             # Set values of the inputs for the next loop iteration
             if horizontal_out:
