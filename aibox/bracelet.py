@@ -353,7 +353,9 @@ def navigate_hand(
 def mock_navigate_hand(
         bboxes, 
         search_key_obj: str, 
-        search_key_hand: list, 
+        search_key_hand: list,
+        prev_obj_track_id: int = -1,
+        prev_hand_track_id: int = -1,
         hor_correct: bool = False, 
         ver_correct: bool = False, 
         grasp: bool = False, 
@@ -361,7 +363,7 @@ def mock_navigate_hand(
         search: bool = False, 
         count_searching: int = 0, 
         count_see_object: int = 0, 
-        jitter_guard: int=0, 
+        jitter_guard: int = 0, 
         navigating: bool = False):
     
     '''
@@ -436,18 +438,40 @@ def mock_navigate_hand(
 
     # Search for object and hand with the highest prediction confidence
     # Filter for hand detections
+    curr_hand_track_id = int(prev_hand_track_id)
+
     bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
     for bbox in bboxes_hands:
-        if bbox[6] > max_hand_confidence:
-            hand = bbox[0:4]
-            max_hand_confidence = bbox[6]
+        if bbox[0] < 640 and bbox[1] < 480:
+            # If hand was previously tracked - continue guidance towards it
+            if bbox[4] == prev_hand_track_id:
+                hand = bbox[0:4]
+                max_hand_confidence = bbox[6]
+                break
+            # Otherwise search for the hand with maximum confidence
+            elif bbox[6] > max_hand_confidence:
+                hand = bbox[0:4]
+                max_hand_confidence = bbox[6]
+                curr_hand_track_id = int(bbox[4])
 
     # Filter for target detections
+    curr_obj_track_id = int(prev_obj_track_id)
+
     bboxes_objects = [detection for detection in bboxes if detection[5] == search_key_obj]
     for bbox in bboxes_objects:
-        if bbox[6] > max_obj_confidence:
-            target = bbox[0:4]
-            max_obj_confidence = bbox[6]
+        if bbox[0] < 640 and bbox[1] < 480:
+            # If target was previously tracked - continue guidance towards it
+            if bbox[4] == prev_obj_track_id:
+                target = bbox[0:4]
+                max_obj_confidence = bbox[6]
+                break
+            # Otherwise search for the target with maximum confidence
+            elif bbox[6] > max_obj_confidence:
+                target = bbox[0:4]
+                max_obj_confidence = bbox[6]
+                curr_obj_track_id = int(bbox[4])
+
+    print(f'Current track id of the target: {curr_obj_track_id}')
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
@@ -488,7 +512,7 @@ def mock_navigate_hand(
 
         grasp = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
 
 
     # 2. Guidance: If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
@@ -527,7 +551,7 @@ def mock_navigate_hand(
             else:
                 vertical = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
 
 
     # 3. Lost target: If the camera cannot see the hand or the object, tell them they need to move around
@@ -548,7 +572,7 @@ def mock_navigate_hand(
                 search = False
                 count_searching = 0
             
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
 
 
     # 4. Lost hand: If the camera cannot see the hand but the object is visible, tell them to move the hand around
@@ -573,8 +597,9 @@ def mock_navigate_hand(
                 obj_seen_prev = False
                 count_see_object = 0
         
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
     
     else:
         print('Condition not covered by logic. Maintaining variables and standing by.')
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        grasp = False
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
