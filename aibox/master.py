@@ -329,6 +329,8 @@ def run(
     prev_frames = None
     curr_frames = None
     outputs = []
+    detections = []
+    ids = []
 
     # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -417,6 +419,40 @@ def run(
             fps = 1 / runtime
             prev_frames = curr_frames
             # Save (running mean) FPS
+
+        """
+        # PSEUDOCODE:
+        # Check for previous tracks -> if first detection, just append all tracks to detections, else:
+        # Iterate through trackIDs of curr_tracks and compare to all previous IDs:
+        #       If the ID did not exist before, add the new track
+        #       Else, if there exists this ID already, check:
+        #           if the BBs of curr track and prev track are not the same --> just update for the new frame
+        #           else, predict the new location of the missing BB information for this frame:
+        #               trajectory_array[this_frame, track_id] = extrapolate(trajectory_array[:this_frame, track_id])
+        curr_tracks = tracker.tracker.tracks
+
+        if len(prev_tracks) == 0:
+            for current_track in curr_tracks:
+                ids.append(current_track.track_id)
+                detections.append([current_track.mean[0:4], current_track.track_id, current_track.class_id, current_track.conf])
+        # If there are previous tracks already, compare whether the track were not updated in the last frame, then predict using extrapolation
+        else:
+            for current_track in curr_tracks:
+                if current_track.track_id in ids:
+                    # update if not same BB
+                    
+                    # if track is not deleted: predict if same BB using extrapolation or some other method
+                    mean, cov = tracker.tracker.kf.initiate(current_track.mean[0:4])
+                    pred = tracker.tracker.kf.predict(mean, cov)
+                    detections.append([pred[0:4], pred.track_id, pred.class_id, pred.conf])
+                    
+                else:
+                    ids.append(current_track.track_id)
+                    detections.append([current_track.mean[0:4], current_track.track_id, current_track.class_id, current_track.conf])
+        
+        # set current tracks to previous tracks
+        prev_tracks = tracker.tracker.tracks
+        """
 
         # Stream results
         im0 = annotator.result()
