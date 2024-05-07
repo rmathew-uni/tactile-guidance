@@ -179,78 +179,6 @@ def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
     return detections, count
 
 
-def load_tracker(model_type, weights, device):
-    if model_type == 'strongsort':
-        model = StrongSORT(
-            model_weights=weights, 
-            device=device,
-            fp16=False,
-            max_dist=0.2,          # The matching threshold. Samples with larger distance are considered an invalid match
-            max_iou_distance=0.7,  # Gating threshold. Associations with cost larger than this value are disregarded.
-            max_age=70,            # Maximum number of missed misses (prediction calls, i.e. frames I think) before a track is deleted
-            n_init=3,              # Number of frames that a track remains in initialization phase
-            nn_budget=100,         # Maximum size of the appearance descriptors gallery)
-            mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
-            ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
-            )         
-    else:
-        raise NotImplementedError("I noticed that StrongSORT is using the same code as DeepSORT, i.e. use model_type = 'strongsort'.")
-        model = DeepSort(
-            max_iou_distance=0.7,
-            max_age=30,
-            n_init=3,
-            nms_max_overlap=1,
-            max_cosine_distance=0.2,
-            nn_budget=None,
-            gating_only_position=False,
-            override_track_class=None,
-            embedder="mobilenet",
-            half=True,
-            bgr=True,
-            embedder_gpu=True,
-            embedder_model_name=None,
-            embedder_wts=None,
-            polygon=False,
-            today=None
-        )
-    return model
-
-
-def update_deepsort(tracker, xywhs, confs, clss, frame):
-    # Convert tensors to Python lists
-    xywhs_list = xywhs.tolist()
-    confs_list = confs.tolist()
-    clss_list = clss.tolist()
-
-    # Create raw detections list
-    raw_detections = []
-    for i in range(len(xywhs_list)):
-        detection = (xywhs_list[i], confs_list[i], clss_list[i])
-        raw_detections.append(detection)
-
-    tracks = tracker.update_tracks(raw_detections, frame=frame)
-
-    outputs = []
-    for track in tracks:
-        if not track.is_confirmed():
-            continue
-        bbox = track.to_ltwh()  # alternative formats: original_ltwh, to_tlwh(), to_ltwh(), to_tlbr(), to_ltrb()
-        left, top, width, height = bbox
-        center_x = int(left + width / 2)
-        center_y = int(top + height / 2)
-        bbox = [center_x, center_y, width, height]
-        if not isinstance(bbox, list):
-            bbox = bbox.tolist() # only necessary if above calculations are not saved in a list already
-        tracked_id = track.track_id
-        class_id = track.det_class
-        confidence = track.det_conf
-        detection = bbox + [int(tracked_id), int(class_id), confidence]  # Combine bbox, class_id, and confidence
-        outputs.append(detection)
-    
-    # Currently does not work, detections for "lost" tracks are saved, but confidence is NoneType
-    return outputs
-
-
 def xyxy_to_xywh(bb):
     x1, y1, x2, y2 = bb
     w = abs(x2 - x1)
@@ -320,7 +248,7 @@ def run(
     # Experiment setup
     if manual_entry == False:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['apple' for i in range(20)] # debugging
+        target_objs = ['bottle' for i in range(5)] # debugging
         obj_index = 0
         gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
@@ -377,22 +305,30 @@ def run(
     master_label = names_obj | labels_hand_adj
 
     # Load tracker model
-    model_type='strongsort'
-    tracker = load_tracker(model_type=model_type, weights=weights_tracker, device=device)
+    tracker = StrongSORT(
+            model_weights=weights_tracker, 
+            device=device,
+            fp16=False,
+            max_dist=0.5,          # The matching threshold. Samples with larger distance are considered an invalid match
+            max_iou_distance=0.7,  # Gating threshold. Associations with cost larger than this value are disregarded.
+            max_age=70,            # Maximum number of missed misses (prediction calls, i.e. frames I think) before a track is deleted
+            n_init=1,              # Number of frames that a track remains in initialization phase --> if 0, track is confirmed on first detection
+            nn_budget=100,         # Maximum size of the appearance descriptors gallery
+            mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
+            ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
+            )
 
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
-    if hasattr(tracker, 'model'):
-        if hasattr(tracker.model, 'warmup'):
-            tracker.model.warmup()
+    tracker.model.warmup()
+
+    # endregion
 
     # Initialize vars for tracking
     prev_frames = None
     curr_frames = None
     outputs = []
-
-    # endregion
 
     # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -411,17 +347,17 @@ def run(
         # Inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
-            pred_obj = model_obj(image, augment=augment, visualize=visualize)
+            pred_target = model_obj(image, augment=augment, visualize=visualize)
             pred_hand = model_hand(image, augment=augment, visualize=visualize)
 
         # NMS
         with dt[2]:
-            pred_obj = non_max_suppression(pred_obj, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
+            pred_target = non_max_suppression(pred_target, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
             pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
 
         # region main object tracking
         # Process predictions
-        for i, (hand,object) in enumerate(itertools.zip_longest(pred_hand,pred_obj)):  # per image
+        for i, (hand, target) in enumerate(itertools.zip_longest(pred_hand, pred_target)): # per image
             seen += 1
 
             # i always equals 0 (per frame there is just one prediction object, because just one source)
@@ -437,36 +373,30 @@ def run(
             curr_frames = im0
 
             # Camera motion compensation for hand tracker (ECC)
-            if hasattr(tracker, 'tracker') and hasattr(tracker.tracker, 'camera_update'):
-                if prev_frames is not None and curr_frames is not None:
-                    tracker.tracker.camera_update(prev_frames, curr_frames)
+            if prev_frames is not None and curr_frames is not None:
+                tracker.tracker.camera_update(prev_frames, curr_frames)
 
-            # Pre-process detections
-            if len(hand):
-                hand, s = preprocess_detections(hand, im, im0, master_label, s, index_add)
-            if len(object):
-                object, s = preprocess_detections(object, im, im0, master_label, s)
+            if len(hand) or len(target):
+                # Pre-process detections
+                if len(hand):
+                    hand, s = preprocess_detections(hand, im, im0, master_label, s, index_add)
+                if len(target):
+                    target, s = preprocess_detections(target, im, im0, master_label, s)
 
-            if len(hand) or len(object):
                 # Track hands and objects
                 xywhs_hand = xyxy2xywh(hand[:, 0:4])
                 confs_hand = hand[:, 4]
                 clss_hand = hand[:, 5]
-                xywhs_obj = xyxy2xywh(object[:, 0:4])
-                confs_obj = object[:, 4]
-                clss_obj = object[:, 5]
+                xywhs_obj = xyxy2xywh(target[:, 0:4])
+                confs_obj = target[:, 4]
+                clss_obj = target[:, 5]
                 # Concatenate tracked hands and objects and hands and update tracker
                 xywhs = torch.cat((xywhs_hand, xywhs_obj), dim=0)
                 confs = torch.cat((confs_hand, confs_obj), dim=0)
                 clss = torch.cat((clss_hand, clss_obj), dim=0)
-
-                if model_type == 'strongsort':
-                    outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-                elif model_type == 'deepsort':
-                    outputs = update_deepsort(tracker, xywhs, confs, clss, im0)
-                    print(f'Detections:\n{outputs}')
-                else:
-                    print('Tracker was not correctly initialized.')
+                
+                # Generate tracker outputs for navigation
+                outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
 
                 # Write results to annotator (visualization)
                 for *xyxy, obj_id, cls, conf in outputs:
@@ -629,7 +559,7 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
 
     run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate)
