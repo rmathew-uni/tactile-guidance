@@ -143,6 +143,18 @@ def play_start():
     play_start_thread.start()
 
 
+def close_app(controller):
+    print("Application will be closed")
+    cv2.destroyAllWindows()
+    # As far as I understood, all threads are properly closed by releasing their locks before being stopped
+    threads = threading.enumerate()
+    for thread in threads:
+        thread._tstate_lock = None
+        thread._stop()
+    controller.disconnect_belt()
+    sys.exit()
+
+
 def hist_equalization(im):
     im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
     im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
@@ -228,22 +240,6 @@ def run(
 ):
 
     # region main setup
-    # Check camera connection
-    try:
-        source = str(source)
-        print('Camera connection successful')
-    except:
-        print('Cannot access selected source. Aborting.')
-        sys.exit()
-
-    # Check bracelet connection
-    if not mock_navigate:
-        connection_check, belt_controller = connect_belt()
-        if connection_check:
-            print('Bracelet connection successful.')
-        else:
-            print('Error connecting bracelet. Aborting.')
-            sys.exit()
 
     # Experiment setup
     if manual_entry == False:
@@ -329,8 +325,6 @@ def run(
     prev_frames = None
     curr_frames = None
     outputs = []
-    detections = []
-    ids = []
 
     # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
@@ -419,40 +413,6 @@ def run(
             fps = 1 / runtime
             prev_frames = curr_frames
             # Save (running mean) FPS
-
-        """
-        # PSEUDOCODE:
-        # Check for previous tracks -> if first detection, just append all tracks to detections, else:
-        # Iterate through trackIDs of curr_tracks and compare to all previous IDs:
-        #       If the ID did not exist before, add the new track
-        #       Else, if there exists this ID already, check:
-        #           if the BBs of curr track and prev track are not the same --> just update for the new frame
-        #           else, predict the new location of the missing BB information for this frame:
-        #               trajectory_array[this_frame, track_id] = extrapolate(trajectory_array[:this_frame, track_id])
-        curr_tracks = tracker.tracker.tracks
-
-        if len(prev_tracks) == 0:
-            for current_track in curr_tracks:
-                ids.append(current_track.track_id)
-                detections.append([current_track.mean[0:4], current_track.track_id, current_track.class_id, current_track.conf])
-        # If there are previous tracks already, compare whether the track were not updated in the last frame, then predict using extrapolation
-        else:
-            for current_track in curr_tracks:
-                if current_track.track_id in ids:
-                    # update if not same BB
-                    
-                    # if track is not deleted: predict if same BB using extrapolation or some other method
-                    mean, cov = tracker.tracker.kf.initiate(current_track.mean[0:4])
-                    pred = tracker.tracker.kf.predict(mean, cov)
-                    detections.append([pred[0:4], pred.track_id, pred.class_id, pred.conf])
-                    
-                else:
-                    ids.append(current_track.track_id)
-                    detections.append([current_track.mean[0:4], current_track.track_id, current_track.class_id, current_track.conf])
-        
-        # set current tracks to previous tracks
-        prev_tracks = tracker.tracker.tracks
-        """
 
         # Stream results
         im0 = annotator.result()
@@ -598,6 +558,30 @@ if __name__ == '__main__':
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
     source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
-    mock_navigate = True # Navigate without the bracelet using only print commands
+    mock_navigate = False # Navigate without the bracelet using only print commands
 
-    run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate)
+    # Check camera connection
+    try:
+        source = str(source)
+        print('Camera connection successful')
+    except:
+        print('Cannot access selected source. Aborting.')
+        sys.exit()
+
+    # Check bracelet connection
+    if not mock_navigate:
+        connection_check, belt_controller = connect_belt()
+        if connection_check:
+            print('Bracelet connection successful.')
+        else:
+            print('Error connecting bracelet. Aborting.')
+            sys.exit()
+
+    try:
+        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate)
+        print("In try")
+        close_app(belt_controller)
+    except KeyboardInterrupt:
+        print("In except")
+        close_app(belt_controller)
+    

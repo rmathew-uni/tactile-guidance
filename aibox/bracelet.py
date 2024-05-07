@@ -154,7 +154,6 @@ def navigate_hand(
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
-        print(hand)
         x_center_hand, y_center_hand = hand[0], hand[1]
         # move the y_center of the hand in the direction of the fingertips to help avoid occlusions (testing)
         y_center_hand = y_center_hand - ((hand[3]/2)//4)
