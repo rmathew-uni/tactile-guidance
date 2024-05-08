@@ -17,14 +17,11 @@ import itertools
 import time
 import numpy as np
 
-# Configure relative path
-FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]  # AIBox folder
-sys.path.append(str(ROOT) + '/yolov5')
-if str(ROOT) not in sys.path:
-    sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-#os.chdir(ROOT) # change path to ROOT
+# Use the project file packages instead of the conda packages, i.e. add to system path for import
+file = Path(__file__).resolve()
+root = file.parents[0]
+sys.path.append(str(root) + '/yolov5')
+sys.path.append(str(root) + '/strongsort')
 
 # Object tracking
 import torch
@@ -134,8 +131,8 @@ obj_name_dict = {
 # region Helpers
 
 def playstart():
-    file = ROOT / f'resources/sound/beginning.mp3'
-    #playsound(str(file))
+    file = 'resources/sound/beginning.mp3' # ROOT
+    playsound(str(file))
 
 
 def play_start():
@@ -151,7 +148,7 @@ def close_app(controller):
     for thread in threads:
         thread._tstate_lock = None
         thread._stop()
-    controller.disconnect_belt()
+    controller.disconnect_belt() if controller else None
     sys.exit()
 
 
@@ -203,10 +200,10 @@ def xyxy_to_xywh(bb):
 
 @smart_inference_mode()
 def run(
-        weights_obj=ROOT / 'yolov5s.pt',  # model_obj path or triton URL
-        weights_hand=ROOT / 'hand.pt',  # model_obj path or triton URL
-        weights_tracker= ROOT / 'osnet_x0_25_market1501.pt',
-        source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webca
+        weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
+        weights_hand='hand.pt',  # model_obj path or triton URL # ROOT
+        weights_tracker='osnet_x0_25_market1501.pt', # ROOT
+        source='data/images',  # file/dir/URL/glob/screen/0(webcam) # ROOT
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -226,7 +223,7 @@ def run(
         augment=False,  # augmented inference
         visualize=False,  # visualize features
         update=False,  # update all models
-        project=ROOT / 'runs/detect',  # save results to project/name
+        project='runs/detect',  # save results to project/name # ROOT
         name='exp',  # save results to project/name
         exist_ok=False,  # existing project/name ok, do not increment
         line_thickness=3,  # bounding box thickness (pixels)
@@ -244,7 +241,7 @@ def run(
     # Experiment setup
     if manual_entry == False:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['bottle' for i in range(5)] # debugging
+        target_objs = ['cup' for i in range(5)] # debugging
         obj_index = 0
         gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
@@ -266,7 +263,8 @@ def run(
 
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    if save_img:
+        (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load object detection models
     device = select_device(device)
@@ -467,8 +465,8 @@ def run(
                     if target_obj_verb in obj_name_dict.values():
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
-                        file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
-                        #playsound(str(file))
+                        file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
+                        playsound(str(file))
                         # Start trial time measure (end in navigate_hand(...))
                     else:
                         print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
@@ -505,8 +503,8 @@ def run(
             if gave_command == False:
                 target_obj_verb = target_objs[obj_index]
                 class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
-                file = ROOT / f'resources/sound/{target_obj_verb}.mp3'
-                #playsound(str(file))
+                file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
+                playsound(str(file))
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
@@ -529,8 +527,8 @@ def run(
                 obj_index += 1
 
             if obj_index == len(target_objs):
-                file = ROOT / f'resources/sound/ending.mp3'
-                #playsound(str(file))
+                file = 'resources/sound/ending.mp3' # ROOT
+                playsound(str(file))
                 print('Experiment Completed')
                 break
 
@@ -558,7 +556,8 @@ if __name__ == '__main__':
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
     source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
-    mock_navigate = False # Navigate without the bracelet using only print commands
+    mock_navigate = True # Navigate without the bracelet using only print commands
+    belt_controller = None
 
     # Check camera connection
     try:
@@ -578,10 +577,8 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate)
-        print("In try")
+        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate, nosave=True)
         close_app(belt_controller)
     except KeyboardInterrupt:
-        print("In except")
         close_app(belt_controller)
     
