@@ -132,7 +132,7 @@ def select_device(device='', batch_size=0, newline=True):
         s += 'MPS\n'
         arg = 'mps'
     else:  # revert to CPU
-        s += 'CPU\n'
+        s += 'CPU'
         arg = 'cpu'
 
     if not newline:

@@ -16,12 +16,22 @@ from pathlib import Path
 import itertools
 import time
 import numpy as np
+import torch.nn.functional as F
 
 # Use the project file packages instead of the conda packages, i.e. add to system path for import
 file = Path(__file__).resolve()
 root = file.parents[0]
-sys.path.append(str(root) + '/yolov5')
-sys.path.append(str(root) + '/strongsort')
+modules = ['yolov5', 'strongsort', 'depthanything']
+for m in modules:
+    path = root / m
+    if path.exists() and str(path) not in sys.path:
+        sys.path.append(str(path))
+        #print(f"Added {path} to sys.path")
+    elif not path.exists():
+        print(f"Error: {path} does not exist.")
+    elif str(path) in sys.path:
+        print(f"{path} already exists in sys.path")
+#print(sys.path)
 
 # Object tracking
 import torch
@@ -33,6 +43,9 @@ from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
 from deep_sort_realtime.deepsort_tracker import DeepSort
+from depthanything.depth_anything.dpt import DepthAnything
+from depthanything.depth_anything.util.transform import Resize, NormalizeImage, PrepareForNet
+from torchvision.transforms import Compose
 
 # Navigation
 from bracelet import navigate_hand, mock_navigate_hand, connect_belt
@@ -132,7 +145,7 @@ obj_name_dict = {
 
 def playstart():
     file = 'resources/sound/beginning.mp3' # ROOT
-    playsound(str(file))
+    #playsound(str(file))
 
 
 def play_start():
@@ -153,7 +166,7 @@ def close_app(controller):
 
 
 def hist_equalization(im):
-    im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
+    im_eq = np.squeeze(np.transpose(im, (2,3,1,0)))
     im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
     #configure CLAHE
     clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
@@ -186,6 +199,54 @@ def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
         count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
     
     return detections, count
+
+
+def get_depth(im, transform, depth_anything, vis=False, bbs=None):
+    """
+    Estimate the depth of each pixel location in an image with shape (H, W, 3).
+    """
+
+    # Estimate depth from image
+    print(f'Image {im.shape}, min {np.min(im)}, max {np.max(im)}')
+    h, w = im.shape[:2]
+    im = transform({'image': im})['image']
+    im = torch.from_numpy(im).unsqueeze(0)
+    depth = depth_anything(im) # (1,H,W)
+    depth_image = F.interpolate(depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0] # this should be metric depth estimation
+    print(f'Depth image interpolated {depth_image.shape}, min depth {depth_image.min()}, max depth {depth_image.max()}')
+    
+
+    # If visualize, only display image by adding dimensions to depth array, scale and apply heatmap
+    if vis:
+        depth_image = (depth_image - depth_image.min()) / (depth_image.max() - depth_image.min()) * 255.0
+        depth_image = depth_image.cpu().numpy().astype(np.uint8) # (H,W)
+        depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_INFERNO) # (H,W,3)
+        cv2.imshow('Depth Image', depth_image)
+
+    # Catch no bounding boxes
+    if bbs is None:
+        print("There are no bounding boxes to estimate the depth for.")
+        return
+
+    # Append depth estimation for each bounding box
+    detections = []
+    for bb in bbs:
+        xc,yc,bbw,bbh = bb[:4]
+        y_min = int(yc - bbh/2)
+        y_max = int(yc + bbh/2)
+        x_min = int(xc - bbw/2)
+        x_max = int(xc + bbw/2)
+        roi = np.squeeze(depth_image[y_min:y_max, x_min:x_max]).numpy() # (bbh,bbw)
+        #print(f'ROI {roi.shape}\n{roi}')
+        # at the moment the ROI is just averaged to get the depth of the BB (could be improved later on)
+        z = np.mean(roi.flatten())
+        bb = np.append(bb, z) # (8,)
+        detections.append(bb) # (N,8)
+    
+    detections = np.array(detections)
+    
+    print(f'Outputs {detections.shape}\n{detections}')
+    return detections
 
 
 def xyxy_to_xywh(bb):
@@ -266,7 +327,9 @@ def run(
     if save_img:
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
+
     # Load object detection models
+    print(f'\nLOADING OBJECT DETECTORS')
     device = select_device(device)
     model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, fp16=half)
     model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, fp16=half)
@@ -276,7 +339,8 @@ def run(
     imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
-    # Dataloader
+    # Load the data from source
+    print(f'\nLOADING DATA')
     bs = 1  # batch_size
     view_img = check_imshow(warn=True)
     try:
@@ -299,6 +363,7 @@ def run(
     master_label = names_obj | labels_hand_adj
 
     # Load tracker model
+    print(f'LOADING OBJECT TRACKER')
     tracker = StrongSORT(
             model_weights=weights_tracker, 
             device=device,
@@ -312,6 +377,27 @@ def run(
             ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
             )
 
+    # Instantiate depth estimator
+    print(f'\nLOADING DEPTH ESTIMATOR')
+    encoder = 'vits' # 'vits' (24.79M) or 'vitb' or 'vitl' (335.32M)
+    depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_{:}14'.format(encoder)).eval()
+    total_params = sum(param.numel() for param in depth_anything.parameters())
+    print('Total parameters: {:.2f}M'.format(total_params / 1e6))
+
+    transform = Compose([
+        Resize(
+            width=imgsz[0],
+            height=imgsz[1],
+            resize_target=False,
+            keep_aspect_ratio=True,
+            ensure_multiple_of=14,
+            resize_method='lower_bound',
+            image_interpolation_method=cv2.INTER_CUBIC,
+        ),
+        NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        PrepareForNet(),
+    ])
+
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
@@ -322,21 +408,29 @@ def run(
     # Initialize vars for tracking
     prev_frames = None
     curr_frames = None
+    fpss = []
     outputs = []
+
+    print(f'\nSTARTING MAIN LOOP')
 
     # Process the whole dataset / stream
     for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
+        #print(f'Frame {frame_idx}, Avg FPS {np.mean(fpss)}')
 
         # Start timer for fps measure
         start = time.perf_counter()
 
         # Image pre-processing
         with dt[0]:
+            
+            # im shape (1, 3, H, W)
             image = torch.from_numpy(im).to(model_obj.device)
             image = image.half() if model_obj.fp16 else image.float()  # uint8 to fp16/32
             image /= 255  # 0 - 255 to 0.0 - 1.0
+
+            # expand for batch dim
             if len(image.shape) == 3:
-                image = image[None]  # expand for batch dim
+                image = image[None]
 
         # Inference
         with dt[1]:
@@ -391,6 +485,13 @@ def run(
                 
                 # Generate tracker outputs for navigation
                 outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                # Get depth information
+                if len(outputs) > 0:
+                    # convert xyxy to xywh bb
+                    for det in range(len(outputs)):
+                        outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
+                    # estimate depth for each detection
+                    outputs = get_depth(im0, transform, depth_anything, bbs=outputs)
 
                 # Write results to annotator (visualization)
                 for *xyxy, obj_id, cls, conf in outputs:
@@ -405,20 +506,23 @@ def run(
                             txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                             save_one_box(xyxy, imc, file=save_dir / 'crops' / txt_file_name / master_label[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
 
-            # Get FPS
+            # Get FPS and running mean FPS
             end = time.perf_counter()
             runtime = end - start
             fps = 1 / runtime
+            fpss.append(fps)
             prev_frames = curr_frames
-            # Save (running mean) FPS
 
         # Stream results
         im0 = annotator.result()
         if view_img:
             #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
-            cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
+            cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
             #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
+
+            # Visualize depth map (high computational cost!)
+            #get_depth(im0, transform, depth_anything, vis=True) # (H,W,3)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -450,10 +554,6 @@ def run(
 
         # region main navigation loop
         # After passing target object class hand is navigated in each frame until grasping command is sent
-        if len(outputs) > 0:
-            for det in range(len(outputs)):
-                outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
-
         if manual_entry == True:
             if target_entered == False:
                 user_in = "n"
@@ -466,7 +566,7 @@ def run(
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
                         file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
-                        playsound(str(file))
+                        #playsound(str(file))
                         # Start trial time measure (end in navigate_hand(...))
                     else:
                         print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
@@ -504,7 +604,7 @@ def run(
                 target_obj_verb = target_objs[obj_index]
                 class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
                 file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
-                playsound(str(file))
+                #playsound(str(file))
                 grasp = False
                 horizontal_in, horizontal_out = False, False
                 vertical_in, vertical_out = False, False
@@ -528,7 +628,7 @@ def run(
 
             if obj_index == len(target_objs):
                 file = 'resources/sound/ending.mp3' # ROOT
-                playsound(str(file))
+                #playsound(str(file))
                 print('Experiment Completed')
                 break
 
@@ -559,10 +659,12 @@ if __name__ == '__main__':
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
 
+    print(f'\nLOADING CAMERA AND BRACELET')
+
     # Check camera connection
     try:
         source = str(source)
-        print('Camera connection successful')
+        print('Camera connection successful.')
     except:
         print('Cannot access selected source. Aborting.')
         sys.exit()
