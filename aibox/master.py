@@ -4,6 +4,7 @@ This script is using code from the following sources:
 - StrongSORT MOT, https://github.com/dyhBUPT/StrongSORT, https://pypi.org/project/strongsort/
 - Youtube Tutorial "Simple YOLOv8 Object Detection & Tracking with StrongSORT & ByteTrack" by Nicolai Nielsen, https://www.youtube.com/watch?v=oDALtKbprHg
 - https://github.com/zenjieli/Yolov5StrongSORT/blob/master/track.py, original: https://github.com/mikel-brostrom/yolo_tracking/commit/9fec03ddba453959f03ab59bffc36669ae2e932a
+- DepthAnything Depth Estimation, https://github.com/LiheYoung/Depth-Anything
 """
 
 # region Setup
@@ -207,11 +208,12 @@ def get_depth(im, transform, depth_anything, vis=False, bbs=None):
     """
 
     # Estimate depth from image
-    print(f'Image {im.shape}, min {np.min(im)}, max {np.max(im)}')
+    print(f'\nImage {im.shape}, min {np.min(im)}, max {np.max(im)}')
     h, w = im.shape[:2]
     im = transform({'image': im})['image']
     im = torch.from_numpy(im).unsqueeze(0)
-    depth = depth_anything(im) # (1,H,W)
+    with torch.no_grad():
+        depth = depth_anything(im) # (1,H,W)
     depth_image = F.interpolate(depth[None], (h, w), mode='bilinear', align_corners=False)[0, 0] # this should be metric depth estimation
     print(f'Depth image interpolated {depth_image.shape}, min depth {depth_image.min()}, max depth {depth_image.max()}')
     
