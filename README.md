@@ -58,4 +58,30 @@ After that you can convert it for the Tensorflow-Lite Runtime using
 ```bash
 $ python app_export.py --hands hand_saved_model --output hands.tflite
 ```
-To run the master.py file, change directory into the aibox folder before executing the code (pathing issue).
+
+## Acknowledgments
+
+Below you can find references to the work of others that is used in this project:
+- YOLOv5 🚀 by Ultralytics, AGPL-3.0 license, https://github.com/ultralytics/yolov5
+- StrongSORT MOT, https://github.com/dyhBUPT/StrongSORT, https://pypi.org/project/strongsort/
+- YOLO tracking, https://github.com/zenjieli/Yolov5StrongSORT/blob/master/track.py, original: https://github.com/mikel-brostrom/yolo_tracking/commit/9fec03ddba453959f03ab59bffc36669ae2e932a
+- Depth-Anything Depth Estimation, https://github.com/LiheYoung/Depth-Anything
+
+
+## Citation
+
+Please consider citing our work if you find the repository useful:
+
+```bibtex
+@Article{tactileBracelet,
+AUTHOR = {Powell, Piper and Pätzold, Florian and Rouygari, Milad and Furtak, Marcin and Kärcher, Silke M. and König, Peter},
+TITLE = {Helping Blind People Grasp: Evaluating a Tactile Bracelet for Remotely Guiding Grasping Movements},
+JOURNAL = {Sensors},
+VOLUME = {24},
+YEAR = {2024},
+NUMBER = {9},
+ARTICLE-NUMBER = {2949},
+URL = {https://www.mdpi.com/1424-8220/24/9/2949},
+DOI = {10.3390/s24092949}
+}
+```
