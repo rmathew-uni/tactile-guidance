@@ -59,7 +59,7 @@ After that you can convert it for the Tensorflow-Lite Runtime using
 $ python app_export.py --hands hand_saved_model --output hands.tflite
 ```
 
-## Acknowledgments
+## Acknowledgements
 
 Below you can find references to the work of others that is used in this project:
 - YOLOv5 🚀 by Ultralytics, AGPL-3.0 license, https://github.com/ultralytics/yolov5
