@@ -296,7 +296,8 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
         manual_entry=False, # True means you will control the exp manually versus the standard automatic running
-        mock_navigate=True # True means that navigation will be conducted only via print commands without connecting the bracelet
+        mock_navigate=True, # True means that navigation will be conducted only via print commands without connecting the bracelet
+        depth_estimation=False # True means that depth estimation algorithm will be initiated and utilized
 ):
 
     # region main setup
@@ -380,25 +381,26 @@ def run(
             )
 
     # Instantiate depth estimator
-    print(f'\nLOADING DEPTH ESTIMATOR')
-    encoder = 'vits' # 'vits' (24.79M) or 'vitb' or 'vitl' (335.32M)
-    depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_{:}14'.format(encoder)).eval()
-    total_params = sum(param.numel() for param in depth_anything.parameters())
-    print('Total parameters: {:.2f}M'.format(total_params / 1e6))
+    if depth_estimation:
+        print(f'\nLOADING DEPTH ESTIMATOR')
+        encoder = 'vits' # 'vits' (24.79M) or 'vitb' or 'vitl' (335.32M)
+        depth_anything = DepthAnything.from_pretrained('LiheYoung/depth_anything_{:}14'.format(encoder)).eval()
+        total_params = sum(param.numel() for param in depth_anything.parameters())
+        print('Total parameters: {:.2f}M'.format(total_params / 1e6))
 
-    transform = Compose([
-        Resize(
-            width=imgsz[0],
-            height=imgsz[1],
-            resize_target=False,
-            keep_aspect_ratio=True,
-            ensure_multiple_of=14,
-            resize_method='lower_bound',
-            image_interpolation_method=cv2.INTER_CUBIC,
-        ),
-        NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        PrepareForNet(),
-    ])
+        transform = Compose([
+            Resize(
+                width=imgsz[0],
+                height=imgsz[1],
+                resize_target=False,
+                keep_aspect_ratio=True,
+                ensure_multiple_of=14,
+                resize_method='lower_bound',
+                image_interpolation_method=cv2.INTER_CUBIC,
+            ),
+            NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            PrepareForNet(),
+        ])
 
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
@@ -487,13 +489,15 @@ def run(
                 
                 # Generate tracker outputs for navigation
                 outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+                
+                if depth_estimation:
                 # Get depth information
-                if len(outputs) > 0:
-                    # convert xyxy to xywh bb
-                    for det in range(len(outputs)):
-                        outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
-                    # estimate depth for each detection
-                    outputs = get_depth(im0, transform, depth_anything, bbs=outputs)
+                    if len(outputs) > 0:
+                        # convert xyxy to xywh bb
+                        for det in range(len(outputs)):
+                            outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
+                        # estimate depth for each detection
+                        outputs = get_depth(im0, transform, depth_anything, bbs=outputs)
 
                 # Write results to annotator (visualization)
                 for *xyxy, obj_id, cls, conf in outputs:
@@ -657,8 +661,9 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
+    depth_estimation = False
     belt_controller = None
 
     print(f'\nLOADING CAMERA AND BRACELET')
@@ -681,7 +686,13 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate, nosave=True)
+        run(weights_obj=weights_obj,
+            weights_hand=weights_hand,
+            weights_tracker=weights_tracker,
+            source=source,
+            mock_navigate=mock_navigate,
+            depth_estimation=depth_estimation,
+            nosave=True)
         close_app(belt_controller)
     except KeyboardInterrupt:
         close_app(belt_controller)
