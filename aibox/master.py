@@ -25,6 +25,7 @@ sys.path.append(str(root) + '/strongsort')
 
 # Object tracking
 import torch
+from labels import coco_labels # COCO labels dictionary
 from yolov5.models.common import DetectMultiBackend
 from yolov5.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
@@ -32,7 +33,6 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
-from deep_sort_realtime.deepsort_tracker import DeepSort
 
 # Navigation
 from bracelet import navigate_hand, mock_navigate_hand, connect_belt
@@ -41,90 +41,6 @@ from bracelet import navigate_hand, mock_navigate_hand, connect_belt
 import keyboard
 from playsound import playsound
 import threading
-
-# COCO labels dictionary
-obj_name_dict = {
-0: "person",
-1: "bicycle",
-2: "car",
-3: "motorcycle",
-4: "airplane",
-5: "bus",
-6: "train",
-7: "truck",
-8: "boat",
-9: "traffic light",
-10: "fire hydrant",
-11: "stop sign",
-12: "parking meter",
-13: "bench",
-14: "bird",
-15: "cat",
-16: "dog",
-17: "horse",
-18: "sheep",
-19: "cow",
-20: "elephant",
-21: "bear",
-22: "zebra",
-23: "giraffe",
-24: "backpack",
-25: "umbrella",
-26: "handbag",
-27: "tie",
-28: "suitcase",
-29: "frisbee",
-30: "skis",
-31: "snowboard",
-32: "sports ball",
-33: "kite",
-34: "baseball bat",
-35: "baseball glove",
-36: "skateboard",
-37: "surfboard",
-38: "tennis racket",
-39: "bottle",
-40: "wine glass",
-41: "cup",
-42: "fork",
-43: "knife",
-44: "spoon",
-45: "bowl",
-46: "banana",
-47: "apple",
-48: "sandwich",
-49: "orange",
-50: "broccoli",
-51: "carrot",
-52: "hot dog",
-53: "pizza",
-54: "donut",
-55: "cake",
-56: "chair",
-57: "couch",
-58: "potted plant",
-59: "bed",
-60: "dining table",
-61: "toilet",
-62: "tv",
-63: "laptop",
-64: "mouse",
-65: "remote",
-66: "keyboard",
-67: "cell phone",
-68: "microwave",
-69: "oven",
-70: "toaster",
-71: "sink",
-72: "refrigerator",
-73: "book",
-74: "clock",
-75: "vase",
-76: "scissors",
-77: "teddy bear",
-78: "hair drier",
-79: "toothbrush"
-}
 
 # endregion
 
@@ -152,42 +68,6 @@ def close_app(controller):
     sys.exit()
 
 
-def hist_equalization(im):
-    im_eq = np.squeeze(np.transpose(im, (3,2,1,0)))
-    im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
-    #configure CLAHE
-    clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
-    #0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
-    im[:,:,0] = clahe.apply(im[:,:,0])
-    im = cv2.cvtColor(im, cv2.COLOR_Lab2RGB)
-    im = np.transpose(im, (2,0,1))
-    im = np.expand_dims(im, axis=0)
-    return im
-
-
-def resize_image(im):
-    # Resizing to Hx640 (training on 640x640 images)
-    aspect_ratio = im.shape[1] / im.shape[0] # width / height
-    im = cv2.resize(im, dsize=(640, int(640/aspect_ratio))) # width, height
-    return im
-
-
-def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
-    # Rescale boxes from img_size to im0 size
-    detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
-
-    if idx_shift is not None:
-        for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
-            detections[-k-1][-1] = cls + idx_shift
-
-    # Print results
-    for c in detections[:, 5].unique():
-        n = (detections[:, 5] == c).sum()  # detections per class
-        count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
-    
-    return detections, count
-
-
 def xyxy_to_xywh(bb):
     x1, y1, x2, y2 = bb
     w = abs(x2 - x1)
@@ -209,14 +89,12 @@ def run(
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
         save_txt=False,  # save results to *.txtm)
-        #data_obj=ROOT / 'coco.yaml',  # dataset.yaml path
-        #data_hand=ROOT / 'data.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.7,  # confidence threshold
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
-        classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class /  check coco.yaml file or obj_name_dict variable in this script
+        classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class /  check coco.yaml file or coco_labels variable in this script
         classes_hand=[0,1], 
         class_hand_nav=[80,81],
         agnostic_nms=False,  # class-agnostic NMS
@@ -224,7 +102,7 @@ def run(
         visualize=False,  # visualize features
         update=False,  # update all models
         project='runs/detect',  # save results to project/name # ROOT
-        name='exp',  # save results to project/name
+        name='video',  # save results to project/name
         exist_ok=False,  # existing project/name ok, do not increment
         line_thickness=3,  # bounding box thickness (pixels)
         hide_labels=False,  # hide labels
@@ -241,7 +119,7 @@ def run(
     # Experiment setup
     if manual_entry == False:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['cup' for i in range(5)] # debugging
+        target_objs = ['apple' for i in range(5)] # debugging
         obj_index = 0
         gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
@@ -252,16 +130,16 @@ def run(
     target_entered = False
     play_start()  # play welcome sound
 
-    # Configure flags
+    # Configure saving
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.streams') or (is_url and not is_file)
     screenshot = source.lower().startswith('screen')
+
     if is_url and is_file:
         source = check_file(source)  # download
 
-    # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     if save_img:
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
@@ -273,10 +151,10 @@ def run(
 
     stride_obj, names_obj, pt_obj = model_obj.stride, model_obj.names, model_obj.pt
     stride_hand, names_hand, pt_hand = model_hand.stride, model_hand.names, model_hand.pt
-    imgsz = check_img_size(imgsz, s=stride_obj)  # check image size
-    seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    imgsz = check_img_size(imgsz, s=stride_obj) # check image size
+    dt = (Profile(), Profile(), Profile())
 
-    # Dataloader
+    # Load data stream
     bs = 1  # batch_size
     view_img = check_imshow(warn=True)
     try:
@@ -319,16 +197,24 @@ def run(
 
     # endregion
 
+
+    # region main tracking
+
     # Initialize vars for tracking
     prev_frames = None
     curr_frames = None
     outputs = []
 
-    # Process the whole dataset / stream
-    for frame_idx, (path, im, im0s, vid_cap, s) in enumerate(dataset):
+    # Data processing: Iterate over each frame of the live stream
+    for frame, (path, im, im0s, vid_cap, _) in enumerate(dataset):
 
-        # Start timer for fps measure
+        # Start timer for FPS measure
         start = time.perf_counter()
+
+        # Setup saving and visualization
+        p, im0 = Path(path[0]), im0s[0].copy() # idx 0 is for first source (and we only have one source)
+        save_path = str(save_dir / p.name)  # im.jpg
+        annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
 
         # Image pre-processing
         with dt[0]:
@@ -338,100 +224,79 @@ def run(
             if len(image.shape) == 3:
                 image = image[None]  # expand for batch dim
 
-        # Inference
+        # Object detection inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
             pred_target = model_obj(image, augment=augment, visualize=visualize)
             pred_hand = model_hand(image, augment=augment, visualize=visualize)
 
-        # NMS
+        # Non-maximal supression
         with dt[2]:
-            pred_target = non_max_suppression(pred_target, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det)
-            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det)
+            pred_target = non_max_suppression(pred_target, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det) # list of (n,6) tensors
+            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det) # list of (n,6) tensors
 
-        # region main object tracking
-        # Process predictions
-        for i, (hand, target) in enumerate(itertools.zip_longest(pred_hand, pred_target)): # per image
-            seen += 1
+        for hand in pred_hand:
+            if len(hand):
+                hand[0,5] += index_add # assign correct classID by adding len(coco_labels)
 
-            # i always equals 0 (per frame there is just one prediction object, because just one source)
-            p, im0, frame = path[i], im0s[i].copy(), dataset.count
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # im.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
-            s += '%gx%g ' % im.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names_obj))
+        # Camera motion compensation for tracker (ECC)
+        curr_frames = im0
+        tracker.tracker.camera_update(prev_frames, curr_frames)
+        
+        # Initialize/clear detections
+        xywhs = torch.empty(0,4)
+        confs = torch.empty(0)
+        clss = torch.empty(0)
 
-            curr_frames = im0
+        # Process object detections
+        preds = [torch.cat((target,hand)) for target, hand in zip(pred_target, pred_hand)]
+        for det in preds:
+            det[:4] = scale_boxes(im.shape[2:], det[:4], im0.shape).round()
+            xywhs = xyxy2xywh(det[:, 0:4])
+            confs = det[:, 4]
+            clss = det[:, 5]
 
-            # Camera motion compensation for hand tracker (ECC)
-            if prev_frames is not None and curr_frames is not None:
-                tracker.tracker.camera_update(prev_frames, curr_frames)
+        # Generate tracker outputs for navigation
+        outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
 
-            if len(hand) or len(target):
-                # Pre-process detections
-                if len(hand):
-                    hand, s = preprocess_detections(hand, im, im0, master_label, s, index_add)
-                if len(target):
-                    target, s = preprocess_detections(target, im, im0, master_label, s)
+        print(f'\nOutputs\n{outputs}')
+        print('Tracks')
+        for track in tracker.tracker.tracks:
+            print(track.mean[:4], track.track_id, track.class_id, float(track.conf), track.state)
 
-                # Track hands and objects
-                xywhs_hand = xyxy2xywh(hand[:, 0:4])
-                confs_hand = hand[:, 4]
-                clss_hand = hand[:, 5]
-                xywhs_obj = xyxy2xywh(target[:, 0:4])
-                confs_obj = target[:, 4]
-                clss_obj = target[:, 5]
-                # Concatenate tracked hands and objects and hands and update tracker
-                xywhs = torch.cat((xywhs_hand, xywhs_obj), dim=0)
-                confs = torch.cat((confs_hand, confs_obj), dim=0)
-                clss = torch.cat((clss_hand, clss_obj), dim=0)
-                
-                # Generate tracker outputs for navigation
-                outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
+        # Get FPS
+        end = time.perf_counter()
+        runtime = end - start
+        fps = 1 / runtime
+        prev_frames = curr_frames
+        # Save (running mean) FPS
 
-                # Write results to annotator (visualization)
-                for *xyxy, obj_id, cls, conf in outputs:
-                    id = int(obj_id)
-                    c = int(cls)
+        # Write results
+        for *xyxy, obj_id, cls, conf in outputs:
+            id, cls = int(obj_id), int(cls)
+            if save_img or save_crop or view_img:
+                label = None if hide_labels else (f'ID: {id} {master_label[cls]}' if hide_conf else (f'ID: {id} {master_label[cls]} {conf:.2f}'))
+                annotator.box_label(xyxy, label, color=colors(cls, True))
 
-                    # add BBs to annotator here
-                    if save_img or save_crop or view_img:  # Add bbox to image
-                        label = None if hide_labels else (f'ID: {id} {master_label[c]}' if hide_conf else (f'ID: {id} {master_label[c]} {conf:.2f}'))
-                        annotator.box_label(xyxy, label, color=colors(c, True))
-                        if save_crop:
-                            txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                            save_one_box(xyxy, imc, file=save_dir / 'crops' / txt_file_name / master_label[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
-
-            # Get FPS
-            end = time.perf_counter()
-            runtime = end - start
-            fps = 1 / runtime
-            prev_frames = curr_frames
-            # Save (running mean) FPS
-
-        # Stream results
+        # Display results
         im0 = annotator.result()
         if view_img:
             #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
             cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
             #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
-
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        # Save results (image with detections)
+        # Save results
         if save_img:
             if dataset.mode == 'image':
                 cv2.imwrite(save_path, im0)
             else:  # 'video' or 'stream'
-                if vid_path[i] != save_path:  # new video
-                    vid_path[i] = save_path
-                    if isinstance(vid_writer[i], cv2.VideoWriter):
-                        vid_writer[i].release()  # release previous video writer
+                if vid_path[0] != save_path:  # new video
+                    vid_path[0] = save_path
+                    if isinstance(vid_writer[0], cv2.VideoWriter):
+                        vid_writer[0].release()  # release previous video writer
                     if vid_cap:  # video
                         fps = vid_cap.get(cv2.CAP_PROP_FPS)
                         w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -439,32 +304,30 @@ def run(
                     else:  # stream
                         fps, w, h = 30, im0.shape[1], im0.shape[0]
                     save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                    vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                vid_writer[i].write(im0)
-                
-        # Print time (inference-only)
-        #LOGGER.info(f"{s}{'' if len(hand) or len(object) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+                    vid_writer[0] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                vid_writer[0].write(im0)
 
-        # endregion
-
-
-        # region main navigation loop
-        # After passing target object class hand is navigated in each frame until grasping command is sent
+        # Convert BBs after display
         if len(outputs) > 0:
             for det in range(len(outputs)):
                 outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
 
+        # endregion
+
+
+        # region main navigation
+        # After passing target object class hand is navigated in each frame until grasping command is sent
         if manual_entry == True:
             if target_entered == False:
                 user_in = "n"
                 while user_in == "n":
                     print("These are the available objects:")
-                    print(obj_name_dict)
+                    print(coco_labels)
                     target_obj_verb = input('Enter the object you want to target: ')
 
-                    if target_obj_verb in obj_name_dict.values():
+                    if target_obj_verb in coco_labels.values():
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
-                        class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
+                        class_target_obj = next(key for key, value in coco_labels.items() if value == target_obj_verb)
                         file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
                         playsound(str(file))
                         # Start trial time measure (end in navigate_hand(...))
@@ -502,7 +365,7 @@ def run(
 
             if gave_command == False:
                 target_obj_verb = target_objs[obj_index]
-                class_target_obj = next(key for key, value in obj_name_dict.items() if value == target_obj_verb)
+                class_target_obj = next(key for key, value in coco_labels.items() if value == target_obj_verb)
                 file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
                 playsound(str(file))
                 grasp = False
@@ -547,15 +410,13 @@ def run(
         
 
 if __name__ == '__main__':
-    '''
-    Function that navigates hand toward target object based on input from object and hand detectors.
-    '''
-    #check_requirements(requirements=ROOT / '../requirements.txt', exclude=('tensorboard', 'thop'))
+
+    #check_requirements(requirements='../requirements.txt', exclude=('tensorboard', 'thop'))
 
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
 
@@ -582,3 +443,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         close_app(belt_controller)
     
+    # In the end, kill everything
+    close_app(belt_controller)

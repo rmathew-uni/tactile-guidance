@@ -470,7 +470,7 @@ def mock_navigate_hand(
                 max_obj_confidence = bbox[6]
                 curr_obj_track_id = int(bbox[4])
 
-    print(f'Current track id of the target: {curr_obj_track_id}')
+    #print(f'Current track id of the target: {curr_obj_track_id}')
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
@@ -559,7 +559,7 @@ def mock_navigate_hand(
             jitter_guard = 0 
             obj_seen_prev = False
 
-        print("Lost target from the field of view.")
+        #print("Lost target from the field of view.")
         
         jitter_guard += 1
         if jitter_guard >= 40:
@@ -586,7 +586,7 @@ def mock_navigate_hand(
             navigating = False
             count_searching = 0
 
-            print("Lost hand from the field of view.")
+            #print("Lost hand from the field of view.")
             
             if obj_seen_prev == False:
                 obj_seen_prev = True
