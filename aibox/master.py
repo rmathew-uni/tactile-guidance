@@ -203,6 +203,7 @@ def run(
     # Initialize vars for tracking
     prev_frames = None
     curr_frames = None
+    fpss = []
     outputs = []
 
     # Data processing: Iterate over each frame of the live stream
@@ -268,8 +269,8 @@ def run(
         end = time.perf_counter()
         runtime = end - start
         fps = 1 / runtime
+        fpss.append(fps)
         prev_frames = curr_frames
-        # Save (running mean) FPS
 
         # Write results
         for *xyxy, obj_id, cls, conf in outputs:
@@ -282,7 +283,7 @@ def run(
         im0 = annotator.result()
         if view_img:
             #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
-            cv2.putText(im0, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
+            cv2.putText(im0, f'FPS: {int(fps)}, Avg: {np.mean(fpss)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
             #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
             if cv2.waitKey(1) & 0xFF == ord('q'):
