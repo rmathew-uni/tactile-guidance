@@ -4,24 +4,28 @@ This script is using code from the following sources:
 - StrongSORT MOT, https://github.com/dyhBUPT/StrongSORT, https://pypi.org/project/strongsort/
 - Youtube Tutorial "Simple YOLOv8 Object Detection & Tracking with StrongSORT & ByteTrack" by Nicolai Nielsen, https://www.youtube.com/watch?v=oDALtKbprHg
 - https://github.com/zenjieli/Yolov5StrongSORT/blob/master/track.py, original: https://github.com/mikel-brostrom/yolo_tracking/commit/9fec03ddba453959f03ab59bffc36669ae2e932a
+- MiDaS Depth Estimation: https://github.com/isl-org/MiDaS
 """
 
 # region Setup
 
 # System
 import os
+import requests
 import platform
 import sys
 from pathlib import Path
 import itertools
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Use the project file packages instead of the conda packages, i.e. add to system path for import
 file = Path(__file__).resolve()
 root = file.parents[0]
 sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
+sys.path.append(str(root) + '/MiDaS')
 
 # Object tracking
 import torch
@@ -33,6 +37,10 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
+
+# DE
+from MiDaS.midas.model_loader import default_models, load_model
+from MiDaS.run import create_side_by_side, process
 
 # Navigation
 from bracelet import navigate_hand, mock_navigate_hand, connect_belt
@@ -66,6 +74,26 @@ def close_app(controller):
         thread._stop()
     controller.disconnect_belt() if controller else None
     sys.exit()
+
+
+def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=False, sides=False):
+    """
+    Depth Estimation with MiDaS.
+    """
+    if image.max() > 1:
+        img = np.flip(image, 2)  # in [0, 255] (flip required to get RGB)
+        img = img/255
+    img_resized = transform({"image": img})["image"]
+
+    depth = process(device, model, model_type, img_resized, (net_w, net_h),
+                            image.shape[1::-1], False, True)
+
+    if vis:
+        original_image_bgr = np.flip(image, 2) if sides else None
+        content = create_side_by_side(original_image_bgr, depth, False)
+        cv2.imshow('MiDaS Depth Estimation', content/255)
+
+    return depth
 
 
 def xyxy_to_xywh(bb):
@@ -192,6 +220,39 @@ def run(
             ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
             )
 
+    # Load depth estimator
+    print(f'\nLOADING DEPTH ESTIMATOR')
+    model_type = 'midas_v21_small_256' # smallest and fastest model
+    weights_de = f'./MiDaS/weights/{model_type}.pt'
+
+    # Download weights if not available
+    if not os.path.exists(weights_de):
+        print("File does not exist. Downloading weights...")
+
+        # Get version from model type
+        if 'v21' in model_type:
+            version = 'v2_1'
+        elif model_type == 'dpt_large_384' or model_type == 'dpt_hybrid_384':
+            version = 'v3'
+        else:
+            print('Fallback to latest version V3.1 (May 2024).')
+            version = 'v3_1'
+        
+        # Create and download from URL
+        url = f'https://github.com/isl-org/MiDaS/releases/download/{version}/{model_type}.pt'
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(weights_de, 'wb') as file:
+                file.write(response.content)
+            print("Weights downloaded successfully!")
+        else:
+            print("Failed to download weights file. Status code:", response.status_code)
+    else:
+        print("Weights already exists!")
+
+    model, transform, net_w, net_h = load_model(device, weights_de, model_type, optimize=False, height=640, square=False)
+
+
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
@@ -229,6 +290,10 @@ def run(
             if len(image.shape) == 3:
                 image = image[None]  # expand for batch dim
 
+        # Depth estimation
+        depth = get_depth(im0, transform, device, model, model_type, net_w, net_h, vis=True, sides=True)
+        print(f'Depth {depth.shape}, min {depth.min()}, max {depth.max()}')
+
         # Object detection inference
         with dt[1]:
             visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
@@ -263,9 +328,6 @@ def run(
 
         # Generate tracker outputs for navigation
         outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-        
-        for track in tracker.tracker.tracks:
-            print(track.mean[:4], track.track_id, track.class_id, float(track.conf), track.state)
 
         # Get FPS
         end = time.perf_counter()
