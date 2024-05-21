@@ -111,17 +111,15 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
         manual_entry=False, # True means you will control the exp manually versus the standard automatic running
-        mock_navigate=True # True means that navigation will be conducted only via print commands without connecting the bracelet
 ):
 
     # region main setup
 
     # Experiment setup
-    if manual_entry == False:
+    if not manual_entry:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['cup' for i in range(5)] # debugging
+        target_objs = ['cup' for _ in range(5)] # debugging
         obj_index = 0
-        gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
     else:
         print('The experiment will be run manually. You will enter the desired target for each run yourself.')
@@ -277,6 +275,7 @@ def run(
         #print(f'Frame: {frame}, Average FPS: {int(np.mean(fpss))}, Device: {device}')
         prev_frames = curr_frames
 
+        # region visualization
         # Write results
         for *xyxy, obj_id, cls, conf in outputs:
             id, cls = int(obj_id), int(cls)
@@ -312,6 +311,8 @@ def run(
                     save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                     vid_writer[0] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                 vid_writer[0].write(im0)
+        
+        # endregion
 
         # Convert BBs after display
         if len(outputs) > 0:
@@ -322,9 +323,9 @@ def run(
 
 
         # region main navigation
-        # After passing target object class hand is navigated in each frame until grasping command is sent
-        if manual_entry == True:
-            if target_entered == False:
+        # Get the target object class
+        if not target_entered:
+            if manual_entry:
                 user_in = "n"
                 while user_in == "n":
                     print("These are the available objects:")
@@ -334,108 +335,54 @@ def run(
                     if target_obj_verb in coco_labels.values():
                         user_in = input("Selected object is " + target_obj_verb + ". Correct? [y,n]")
                         class_target_obj = next(key for key, value in coco_labels.items() if value == target_obj_verb)
-                        file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
+                        file = f'resources/sound/{target_obj_verb}.mp3'
                         playsound(str(file))
                         # Start trial time measure (end in navigate_hand(...))
                     else:
                         print(f'The object {target_obj_verb} is not in the list of available targets. Please reselect.')
-
-                target_entered = True
-                grasp = False
-                horizontal_in, horizontal_out = False, False
-                vertical_in, vertical_out = False, False
-                obj_seen_prev, search, navigating = False, False, False
-                count_searching, count_see_object, jitter_guard = 0,0,0
-
-            elif target_entered:
-                pass
-
-            # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
-                navigate_hand(belt_controller, 
-                                outputs, 
-                                class_target_obj, 
-                                class_hand_nav, 
-                                horizontal_in, 
-                                vertical_in, 
-                                grasp, 
-                                obj_seen_prev, 
-                                search, 
-                                count_searching, 
-                                count_see_object, 
-                                jitter_guard, 
-                                navigating)
-        
-            # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-            if grasp:
-                target_entered = False
-
-            # Set values of the inputs for the next loop iteration
-            if horizontal_out:
-                horizontal_in = True
-            if vertical_out:
-                vertical_in = True
-
-        else:
-
-            if gave_command == False:
+            else:
                 target_obj_verb = target_objs[obj_index]
                 class_target_obj = next(key for key, value in coco_labels.items() if value == target_obj_verb)
-                file = f'resources/sound/{target_obj_verb}.mp3' # ROOT
+                file = f'resources/sound/{target_obj_verb}.mp3'
                 playsound(str(file))
-                grasp = False
-                horizontal_in, horizontal_out = False, False
-                vertical_in, vertical_out = False, False
-                gave_command = True
-                obj_seen_prev, search, navigating = False, False, False
-                count_searching, count_see_object, jitter_guard = 0,0,0
-                curr_obj_track_id, curr_hand_track_id = -1,-1
+                # Start trial time measure (end in navigate_hand(...))
 
-            # Navigate the hand based on information from last frame and current frame detections
-            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id = \
-                navigate_hand(belt_controller, 
-                              outputs, 
-                              class_target_obj, 
-                              class_hand_nav, 
-                              horizontal_in, 
-                              vertical_in, 
-                              grasp, 
-                              obj_seen_prev, 
-                              search, 
-                              count_searching, 
-                              count_see_object, 
-                              jitter_guard, 
-                              navigating)
-            
-            # Exit the loop if grasp signal was sent and set index of the next element from the list
-            if grasp and ((obj_index+1)<=len(target_objs)):
-                gave_command = False
+            target_entered = True
+
+        # Navigate the hand based on information from last frame and current frame detections
+        if frame == 0: # Initialize navigation
+            horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
+            navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav)
+
+        horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
+            navigate_hand(belt_controller,
+                          outputs,
+                          class_target_obj,
+                          class_hand_nav,
+                          horizonal,
+                          vertical,
+                          grasp,
+                          obj_seen_prev,
+                          search,
+                          count_searching,
+                          count_see_object,
+                          jitter_guard,
+                          navigating,
+                          obj_track_id,
+                          hand_track_id)
+    
+        # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
+        if grasp:
+            if manual_entry and ((obj_index+1)<=len(target_objs)):
                 obj_index += 1
-
-            if obj_index == len(target_objs):
-                file = 'resources/sound/ending.mp3' # ROOT
-                playsound(str(file))
-                print('Experiment Completed')
-                break
-
-            # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-            #if horizontal_out and vertical_out and grasp:
-            #    gave_command = False
-
-            # Set values of the inputs for the next loop iteration
-            if horizontal_out:
-                horizontal_in = True
-            if vertical_out:
-                vertical_in = True
+            target_entered = False
         
         # endregion
-
         
 
 if __name__ == '__main__':
 
     #check_requirements(requirements='../requirements.txt', exclude=('tensorboard', 'thop'))
-
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
@@ -463,7 +410,7 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, mock_navigate=mock_navigate, nosave=True)
+        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, nosave=True)
         close_app(belt_controller)
     except KeyboardInterrupt:
         close_app(belt_controller)

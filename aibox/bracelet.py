@@ -41,8 +41,6 @@ def navigate_hand(
         bboxes, 
         search_key_obj: str, 
         search_key_hand: list,
-        prev_obj_track_id: int = -1,
-        prev_hand_track_id: int = -1,
         hor_correct: bool = False, 
         ver_correct: bool = False, 
         grasp: bool = False, 
@@ -51,7 +49,9 @@ def navigate_hand(
         count_searching: int = 0, 
         count_see_object: int = 0, 
         jitter_guard: int = 0, 
-        navigating: bool = False
+        navigating: bool = False,
+        prev_obj_track_id: int = -1,
+        prev_hand_track_id: int = -1
         ):
     
     '''
@@ -120,10 +120,11 @@ def navigate_hand(
 
     # Navigation vars
     vibration_intensity = 100
-    max_hand_confidence = 0
-    max_obj_confidence = 0
+    min_hand_confidence = 0.5
+    min_obj_confidence = 0.5
     hand, target = None, None
     horizontal, vertical = False, False
+    w,h = 1920, 1080
 
     if belt_controller:
         termination_signal = start_listener()
@@ -139,16 +140,14 @@ def navigate_hand(
 
     bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
     for bbox in bboxes_hands:
-        if bbox[0] < 640 and bbox[1] < 480:
+        if bbox[0] < w and bbox[1] < h:
             # If hand was previously tracked - continue guidance towards it
             if bbox[4] == prev_hand_track_id:
                 hand = bbox[0:4]
-                max_hand_confidence = bbox[6]
                 break
             # Otherwise search for the hand with maximum confidence
-            elif bbox[6] > max_hand_confidence:
+            elif bbox[6] > min_hand_confidence:
                 hand = bbox[0:4]
-                max_hand_confidence = bbox[6]
                 curr_hand_track_id = int(bbox[4])
 
     # Filter for target detections
@@ -156,30 +155,26 @@ def navigate_hand(
 
     bboxes_objects = [detection for detection in bboxes if detection[5] == search_key_obj]
     for bbox in bboxes_objects:
-        if bbox[0] < 640 and bbox[1] < 480:
+        if bbox[0] < w and bbox[1] < h:
             # If target was previously tracked - continue guidance towards it
             if bbox[4] == prev_obj_track_id:
                 target = bbox[0:4]
-                max_obj_confidence = bbox[6]
                 break
             # Otherwise search for the target with maximum confidence
-            elif bbox[6] > max_obj_confidence:
+            elif bbox[6] > min_obj_confidence:
                 target = bbox[0:4]
-                max_obj_confidence = bbox[6]
                 curr_obj_track_id = int(bbox[4])
 
     #print(f'Current track id of the target: {curr_obj_track_id}')
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
-        #print(f'hand {hand}')
         x_center_hand, y_center_hand = hand[0], hand[1]
         # move the y_center of the hand in the direction of the fingertips to help avoid occlusions (testing)
         hand_upper_bound = y_center_hand - hand[3]//2
         hand_lower_bound = y_center_hand + hand[3]//2
 
     if target is not None:
-        #print(f'target {target}')
         target_width = target[2]
         target_height = target[3]
         target_left_bound = target[0] - target_width//2
