@@ -83,42 +83,6 @@ def close_app(controller):
     sys.exit()
 
 
-def hist_equalization(im):
-    im_eq = np.squeeze(np.transpose(im, (2,3,1,0)))
-    im = cv2.cvtColor(im_eq, cv2.COLOR_RGB2Lab)
-    #configure CLAHE
-    clahe = cv2.createCLAHE(clipLimit=10,tileGridSize=(8,8))
-    #0 to 'L' channel, 1 to 'a' channel, and 2 to 'b' channel
-    im[:,:,0] = clahe.apply(im[:,:,0])
-    im = cv2.cvtColor(im, cv2.COLOR_Lab2RGB)
-    im = np.transpose(im, (2,0,1))
-    im = np.expand_dims(im, axis=0)
-    return im
-
-
-def resize_image(im):
-    # Resizing to Hx640 (training on 640x640 images)
-    aspect_ratio = im.shape[1] / im.shape[0] # width / height
-    im = cv2.resize(im, dsize=(640, int(640/aspect_ratio))) # width, height
-    return im
-
-
-def preprocess_detections(detections, im, im0, labels, count, idx_shift=None):
-    # Rescale boxes from img_size to im0 size
-    detections[:, :4] = scale_boxes(im.shape[2:], detections[:, :4], im0.shape).round()
-
-    if idx_shift is not None:
-        for k, (*xyxy, conf, cls) in enumerate(reversed(detections)):
-            detections[-k-1][-1] = cls + idx_shift
-
-    # Print results
-    for c in detections[:, 5].unique():
-        n = (detections[:, 5] == c).sum()  # detections per class
-        count += f"{n} {labels[int(c)]}{'s' * (n > 1)}, "  # add to string
-    
-    return detections, count
-
-
 def get_depth(im, transform, depth_anything, vis=False, bbs=None):
     """
     Estimate the depth of each pixel location in an image with shape (H, W, 3).
