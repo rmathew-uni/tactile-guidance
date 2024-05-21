@@ -145,6 +145,7 @@ def run(
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load object detection models
+    print(f'\nLOADING OBJECT DETECTORS')
     device = select_device(device)
     model_obj = DetectMultiBackend(weights_obj, device=device, dnn=dnn, fp16=half)
     model_hand = DetectMultiBackend(weights_hand, device=device, dnn=dnn, fp16=half)
@@ -177,6 +178,7 @@ def run(
     master_label = names_obj | labels_hand_adj
 
     # Load tracker model
+    print(f'LOADING OBJECT TRACKER')
     tracker = StrongSORT(
             model_weights=weights_tracker, 
             device=device,
@@ -199,6 +201,8 @@ def run(
 
 
     # region main tracking
+
+    print(f'\nSTARTING MAIN LOOP')
 
     # Initialize vars for tracking
     prev_frames = None
@@ -259,9 +263,7 @@ def run(
 
         # Generate tracker outputs for navigation
         outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-
-        print(f'\nOutputs\n{outputs}')
-        print('Tracks')
+        
         for track in tracker.tracker.tracks:
             print(track.mean[:4], track.track_id, track.class_id, float(track.conf), track.state)
 
@@ -283,7 +285,7 @@ def run(
         im0 = annotator.result()
         if view_img:
             #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
-            cv2.putText(im0, f'FPS: {int(fps)}, Avg: {np.mean(fpss)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
+            cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             cv2.imshow(str(p), im0)
             #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -417,9 +419,11 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
+
+    print(f'\nLOADING CAMERA AND BRACELET')
 
     # Check camera connection
     try:
