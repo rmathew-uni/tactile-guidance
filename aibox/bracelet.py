@@ -586,7 +586,7 @@ def mock_navigate_hand(
             navigating = False
             count_searching = 0
 
-            print("Lost hand from the field of view.")
+            #print("Lost hand from the field of view.")
             
             if obj_seen_prev == False:
                 obj_seen_prev = True
