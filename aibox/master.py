@@ -35,7 +35,7 @@ from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
 
 # Navigation
-from bracelet import navigate_hand, mock_navigate_hand, connect_belt
+from bracelet import navigate_hand, connect_belt
 
 # Utility
 import keyboard
@@ -119,7 +119,7 @@ def run(
     # Experiment setup
     if manual_entry == False:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['apple' for i in range(5)] # debugging
+        target_objs = ['cup' for i in range(5)] # debugging
         obj_index = 0
         gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
@@ -264,14 +264,17 @@ def run(
         # Generate tracker outputs for navigation
         outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
         
+        """
         for track in tracker.tracker.tracks:
             print(track.mean[:4], track.track_id, track.class_id, float(track.conf), track.state)
+        """
 
         # Get FPS
         end = time.perf_counter()
         runtime = end - start
         fps = 1 / runtime
         fpss.append(fps)
+        #print(f'Frame: {frame}, Average FPS: {int(np.mean(fpss))}, Device: {device}')
         prev_frames = curr_frames
 
         # Write results
@@ -348,12 +351,21 @@ def run(
                 pass
 
             # Navigate the hand based on information from last frame and current frame detections
-            if not mock_navigate:
-                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
-            else:
-                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
+                navigate_hand(belt_controller, 
+                                outputs, 
+                                class_target_obj, 
+                                class_hand_nav, 
+                                horizontal_in, 
+                                vertical_in, 
+                                grasp, 
+                                obj_seen_prev, 
+                                search, 
+                                count_searching, 
+                                count_see_object, 
+                                jitter_guard, 
+                                navigating)
+        
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
                 target_entered = False
@@ -380,13 +392,21 @@ def run(
                 curr_obj_track_id, curr_hand_track_id = -1,-1
 
             # Navigate the hand based on information from last frame and current frame detections
-            if not mock_navigate:
-                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
-            else:
-                horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
-
+            horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id = \
+                navigate_hand(belt_controller, 
+                              outputs, 
+                              class_target_obj, 
+                              class_hand_nav, 
+                              horizontal_in, 
+                              vertical_in, 
+                              grasp, 
+                              obj_seen_prev, 
+                              search, 
+                              count_searching, 
+                              count_see_object, 
+                              jitter_guard, 
+                              navigating)
+            
             # Exit the loop if grasp signal was sent and set index of the next element from the list
             if grasp and ((obj_index+1)<=len(target_objs)):
                 gave_command = False
