@@ -4,6 +4,7 @@ This script is using code from the following sources:
 - StrongSORT MOT, https://github.com/dyhBUPT/StrongSORT, https://pypi.org/project/strongsort/
 - Youtube Tutorial "Simple YOLOv8 Object Detection & Tracking with StrongSORT & ByteTrack" by Nicolai Nielsen, https://www.youtube.com/watch?v=oDALtKbprHg
 - https://github.com/zenjieli/Yolov5StrongSORT/blob/master/track.py, original: https://github.com/mikel-brostrom/yolo_tracking/commit/9fec03ddba453959f03ab59bffc36669ae2e932a
+- Monodepth2 depth estimation: https://github.com/nianticlabs/monodepth2
 """
 
 # region Setup
@@ -22,6 +23,7 @@ file = Path(__file__).resolve()
 root = file.parents[0]
 sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
+sys.path.append(str(root) + '/monodepth2')
 
 # Object tracking
 import torch
@@ -33,6 +35,11 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
+
+# Depth Estimation
+import monodepth2.networks as networks
+from monodepth2.layers import disp_to_depth
+from torchvision import transforms
 
 # Navigation
 from bracelet import navigate_hand, connect_belt
@@ -66,6 +73,31 @@ def close_app(controller):
         thread._stop()
     controller.disconnect_belt() if controller else None
     sys.exit()
+
+
+def get_depth(image, feed_width, feed_height, device, encoder, decoder):
+    # Pre-processing
+    original_height, original_width = image.shape[:2]
+    input_image = cv2.resize(image, (feed_width, feed_height), interpolation=cv2.INTER_LANCZOS4)
+    input_image = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
+    input_image = input_image.astype(np.float32) / 255.0
+    input_image = torch.from_numpy(input_image.transpose(2, 0, 1)).unsqueeze(0)
+
+    # Prediction
+    input_image = input_image.to(device)
+    features = encoder(input_image)
+    outputs = decoder(features)
+
+    disp = outputs[("disp", 0)]
+    disp_resized = torch.nn.functional.interpolate(disp, 
+                                                   (original_height, original_width), 
+                                                   mode="bilinear", 
+                                                   align_corners=False)
+    #print(f'disparity resized {disp_resized.shape}, min {disp_resized.min()}, max {disp_resized.max()}')
+    scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
+    print(f'depth {depth.shape}, min {depth.min()}, max {depth.max()}')
+
+    return depth
 
 
 def xyxy_to_xywh(bb):
@@ -190,6 +222,31 @@ def run(
             ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
             )
 
+    # Load depth estimator
+    print(f'\nLOADING DEPTH ESTIMATOR')
+    model_name = 'mono_640x192'
+    model_path = f'monodepth2/models/{model_name}/'
+    encoder_path = model_path + 'encoder.pth'
+    decoder_path = model_path + 'depth.pth'
+    # encoder
+    encoder = networks.ResnetEncoder(18, False)
+    loaded_dict_enc = torch.load(encoder_path, map_location=device)
+    # extract the height and width of image that this model was trained with
+    feed_height = loaded_dict_enc['height']
+    feed_width = loaded_dict_enc['width']
+    filtered_dict_enc = {k: v for k, v in loaded_dict_enc.items() if k in encoder.state_dict()}
+    encoder.load_state_dict(filtered_dict_enc)
+    encoder.to(device)
+    encoder.eval()
+    # decoder
+    decoder = networks.DepthDecoder(
+        num_ch_enc=encoder.num_ch_enc, scales=range(4))
+    loaded_dict = torch.load(decoder_path, map_location=device)
+    decoder.load_state_dict(loaded_dict)
+    decoder.to(device)
+    decoder.eval()
+
+
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
@@ -226,6 +283,8 @@ def run(
             image /= 255  # 0 - 255 to 0.0 - 1.0
             if len(image.shape) == 3:
                 image = image[None]  # expand for batch dim
+
+        depth = get_depth(im0, feed_width, feed_height, device, encoder, decoder)
 
         # Object detection inference
         with dt[1]:
