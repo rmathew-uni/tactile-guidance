@@ -1,3 +1,5 @@
+# region Setup
+
 import time
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
@@ -7,10 +9,9 @@ from auto_connect import interactive_belt_connect, setup_logger
 import threading
 import sys
 from pynput.keyboard import Key, Listener
+import numpy as np
 
-
-# Threading
-one_round = 0
+# endregion
 
 class Delegate(BeltControllerDelegate):
     # Belt controller delegate
@@ -35,6 +36,93 @@ def connect_belt():
         belt_controller.set_belt_mode(BeltMode.APP_MODE)
         return True, belt_controller
 
+
+def abort(key):
+    # Check if the pressed key is the left clicker key
+    if key == Key.esc:
+        sys.exit()
+
+
+def on_click(key):
+    # Check if the pressed key is the right clicker key
+    if key == Key.enter:
+        return False
+
+
+def listener():
+    # listen for clicker
+    with Listener(on_press=abort) as listener:
+        listener.join()
+
+
+def start_listener():
+    global termination_signal, one_round
+    existing_thread = threading.enumerate()
+    listener_thread = None
+
+    for thread in existing_thread:
+        if thread.name == 'clicker':
+            listener_thread = thread
+            termination_signal = False
+            break
+    
+    if listener_thread is None:
+        if one_round == 0:
+            listener_thread = threading.Thread(target=listener, name='clicker')
+            listener_thread.start()
+            one_round += 1
+        else:
+            termination_signal = True
+    
+    return termination_signal
+
+
+def choose_detection(bboxes, previous_bbox=None):
+    # Hyperparameters
+    # ...
+
+    candidates = []
+    for bbox in bboxes: # x, y, w, h, id, cls, conf
+        # bbox has to be within image dimensions
+        if bbox[0] <= w and bbox[1] <= h:
+            # confidence score
+            confidence = bbox[6] # in [0,1]
+            confidence_score = 2**confidence - 1 # exponential growth in [0,1], could also use np.exp() and normalize
+            # tracking score
+            current_track_id = bbox[4]
+            previous_track_id = previous_bbox[4] if previous_bbox else -1
+            track_id_score = np.inf if current_track_id == previous_track_id else 1 # 1|ꝏ
+            # distance score
+            if not previous_bbox:
+                distance_inverted = 1
+            else:
+                current_location = bbox[:2]
+                previous_location = previous_bbox[:2]
+                distance = np.linalg.norm(current_location - previous_location)
+                distance_inverted = 1 / distance if distance >= 1 else 100
+
+            # total score
+            score = track_id_score * confidence_score * distance_inverted
+            # Possible scores:
+            # ꝏ -- same trackingID
+            # 100 -- different trackingID, matching BBs (max. 1px deviation), conf=1
+            # [0,1] -- different trackingID, BBs distance in [1., sqrt(w^2*h^2)], conf=1
+            candidates.append(score)
+        else:
+            candidates.append(0)
+
+    true_detection = bboxes[np.argmax(candidates)] if len(candidates) else None
+
+    return true_detection
+
+
+# Threading vars
+termination_signal = False
+one_round = 0
+
+# Navigation vars
+prev_hand = None
+prev_target = None
 
 def navigate_hand(
         belt_controller,
@@ -74,49 +162,8 @@ def navigate_hand(
     • check_dur
     '''
 
-    # Threading vars
-    global termination_signal 
-    global one_round
-    termination_signal = False
-
-    def abort(key):
-        # Check if the pressed key is the left clicker key
-        if key == Key.esc:
-            sys.exit()
-
-    def on_click(key):
-        # Check if the pressed key is the right clicker key
-        if key == Key.enter:
-            return False
-
-    def listener():
-
-        # listen for clicker
-        with Listener(on_press=abort) as listener:
-            listener.join()
-
-    def start_listener():
-
-        global termination_signal, one_round
-        existing_thread = threading.enumerate()
-        listener_thread = None
-
-        for thread in existing_thread:
-            if thread.name == 'clicker':
-                listener_thread = thread
-                termination_signal = False
-                break
-        
-        if listener_thread is None:
-            if one_round == 0:
-                listener_thread = threading.Thread(target=listener, name='clicker')
-                listener_thread.start()
-                one_round += 1
-            else:
-                termination_signal = True
-        
-        return termination_signal
-
+    global termination_signal
+    global prev_hand, prev_target
 
     # Navigation vars
     vibration_intensity = 100
@@ -139,6 +186,9 @@ def navigate_hand(
     curr_hand_track_id = int(prev_hand_track_id)
 
     bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
+    hand_true = choose_detection(bboxes_hands, prev_hand)
+    prev_hand = hand_true
+
     for bbox in bboxes_hands:
         if bbox[0] < w and bbox[1] < h:
             # If hand was previously tracked - continue guidance towards it
@@ -150,10 +200,17 @@ def navigate_hand(
                 hand = bbox[0:4]
                 curr_hand_track_id = int(bbox[4])
 
+    print(f'Previous hand: {prev_hand}')
+    print(f'Current hand: {hand_true}')
+    print(f'Same target? {hand == hand_true[0:4]}')
+    prev_hand = hand_true
+
     # Filter for target detections
     curr_obj_track_id = int(prev_obj_track_id)
 
     bboxes_objects = [detection for detection in bboxes if detection[5] == search_key_obj]
+    target_true = choose_detection(bboxes_objects, prev_target)
+    
     for bbox in bboxes_objects:
         if bbox[0] < w and bbox[1] < h:
             # If target was previously tracked - continue guidance towards it
@@ -164,6 +221,12 @@ def navigate_hand(
             elif bbox[6] > min_obj_confidence:
                 target = bbox[0:4]
                 curr_obj_track_id = int(bbox[4])
+
+    print(f'Previous target: {prev_target}')
+    print(f'Current target: {target_true}')
+    print(f'Same target? {target == target_true[0:4]}')
+    prev_target = target_true
+    
 
     #print(f'Current track id of the target: {curr_obj_track_id}')
 
