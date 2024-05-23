@@ -123,6 +123,7 @@ one_round = 0
 # Navigation vars
 prev_hand = None
 prev_target = None
+w,h = 1920, 1080
 
 def navigate_hand(
         belt_controller,
