@@ -118,7 +118,7 @@ def run(
     # Experiment setup
     if not manual_entry:
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
-        target_objs = ['cup' for _ in range(5)] # debugging
+        target_objs = ['bottle' for _ in range(5)] # debugging
         obj_index = 0
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
     else:

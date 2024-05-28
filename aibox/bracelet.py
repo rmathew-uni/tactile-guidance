@@ -90,10 +90,10 @@ def choose_detection(bboxes, previous_bbox=None):
             confidence_score = 2**confidence - 1 # exponential growth in [0,1], could also use np.exp() and normalize
             # tracking score
             current_track_id = bbox[4]
-            previous_track_id = previous_bbox[4] if previous_bbox else -1
+            previous_track_id = previous_bbox[4] if previous_bbox is not None else -1
             track_id_score = np.inf if current_track_id == previous_track_id else 1 # 1|ꝏ
             # distance score
-            if not previous_bbox:
+            if previous_bbox is None:
                 distance_inverted = 1
             else:
                 current_location = bbox[:2]
@@ -188,7 +188,6 @@ def navigate_hand(
 
     bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
     hand_true = choose_detection(bboxes_hands, prev_hand)
-    prev_hand = hand_true
 
     for bbox in bboxes_hands:
         if bbox[0] < w and bbox[1] < h:
@@ -201,9 +200,12 @@ def navigate_hand(
                 hand = bbox[0:4]
                 curr_hand_track_id = int(bbox[4])
 
-    print(f'Previous hand: {prev_hand}')
-    print(f'Current hand: {hand_true}')
-    print(f'Same target? {hand == hand_true[0:4]}')
+    if hand_true is not None:
+        print()
+        print(f'Previous hand: {prev_hand}')
+        print(f'Current hand: {hand_true}')
+        print(f'Old hand: {hand}')
+        print(f'Same hand? {np.array_equal(hand, hand_true[:4])}')
     prev_hand = hand_true
 
     # Filter for target detections
@@ -223,9 +225,12 @@ def navigate_hand(
                 target = bbox[0:4]
                 curr_obj_track_id = int(bbox[4])
 
-    print(f'Previous target: {prev_target}')
-    print(f'Current target: {target_true}')
-    print(f'Same target? {target == target_true[0:4]}')
+    if target_true is not None:
+        print()
+        print(f'Previous target: {prev_target}')
+        print(f'Current target: {target_true}')
+        print(f'Old target: {target}')
+        print(f'Same target? {np.array_equal(target, target_true[:4])}')
     prev_target = target_true
     
 
@@ -341,7 +346,7 @@ def navigate_hand(
             jitter_guard = 0 
             obj_seen_prev = False
 
-        print("Lost target from the field of view.")
+        #print("Lost target from the field of view.")
         
         jitter_guard += 1
         if jitter_guard >= 40:
