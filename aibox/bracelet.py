@@ -83,7 +83,7 @@ def choose_detection(bboxes, previous_bbox=None):
     exponential_weight = 2
     distance_weight = 100
 
-    print(f'\nPrevious BB: {previous_bbox}')
+    #print(f'\nPrevious BB: {previous_bbox}')
 
     candidates = []
     for bbox in bboxes: # x, y, w, h, id, cls, conf
@@ -108,9 +108,10 @@ def choose_detection(bboxes, previous_bbox=None):
 
             # total score
             score = track_id_score * confidence_score * distance_inverted
-            print(f'Current BB: {bbox}')
-            print(f'TrackID = {current_track_id}, confidence = {confidence}, distance = {distance}')
-            print(f'Score {score} = {track_id_score} * {confidence_score} * {distance_inverted}')
+            #print(f'Current BB: {bbox}')
+            #print(f'TrackID = {current_track_id}, confidence = {confidence}, distance = {distance}\n')
+            #print(f'Score {score} = {track_id_score} * {confidence_score} * {distance_inverted}')
+
             # Possible scores:
             # ꝏ -- same trackingID
             # 100 -- different trackingID, matching BBs (max. 1px deviation), conf=1
@@ -356,7 +357,7 @@ def navigate_hand(
             navigating = False
             count_searching = 0
 
-            print("Lost hand from the field of view.")
+            #print("Lost hand from the field of view.")
             
             if obj_seen_prev == False:
                 if belt_controller:
