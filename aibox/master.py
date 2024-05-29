@@ -43,7 +43,7 @@ from MiDaS.midas.model_loader import default_models, load_model
 from MiDaS.run import create_side_by_side, process
 
 # Navigation
-from bracelet import navigate_hand, mock_navigate_hand, connect_belt
+from bracelet import navigate_hand, connect_belt
 
 # Utility
 import keyboard
@@ -74,6 +74,40 @@ def close_app(controller):
         thread._stop()
     controller.disconnect_belt() if controller else None
     sys.exit()
+
+
+def get_midas_weights(model_type):
+
+    path = f'./MiDaS/weights/{model_type}.pt'
+
+    # Download weights if not available
+    if not os.path.exists(path):
+        print("File does not exist. Downloading weights...")
+
+        # Get version from model type
+        if 'v21' in model_type:
+            version = 'v2_1'
+        elif model_type == 'dpt_large_384' or model_type == 'dpt_hybrid_384':
+            version = 'v3'
+        else:
+            print('Fallback to latest version V3.1 (May 2024).')
+            version = 'v3_1'
+        
+        # Create and download from URL
+        url = f'https://github.com/isl-org/MiDaS/releases/download/{version}/{model_type}.pt'
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(path, 'wb') as file:
+                file.write(response.content)
+            print("Weights downloaded successfully!")
+        else:
+            print("Failed to download weights file. Status code:", response.status_code)
+    else:
+        print("Weights already exists!")
+
+    weights = f'./MiDaS/weights/{model_type}.pt'
+
+    return weights
 
 
 def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=False, sides=False):
@@ -223,34 +257,9 @@ def run(
     # Load depth estimator
     print(f'\nLOADING DEPTH ESTIMATOR')
     model_type = 'midas_v21_small_256' # smallest and fastest model
-    weights_de = f'./MiDaS/weights/{model_type}.pt'
-
-    # Download weights if not available
-    if not os.path.exists(weights_de):
-        print("File does not exist. Downloading weights...")
-
-        # Get version from model type
-        if 'v21' in model_type:
-            version = 'v2_1'
-        elif model_type == 'dpt_large_384' or model_type == 'dpt_hybrid_384':
-            version = 'v3'
-        else:
-            print('Fallback to latest version V3.1 (May 2024).')
-            version = 'v3_1'
-        
-        # Create and download from URL
-        url = f'https://github.com/isl-org/MiDaS/releases/download/{version}/{model_type}.pt'
-        response = requests.get(url)
-        if response.status_code == 200:
-            with open(weights_de, 'wb') as file:
-                file.write(response.content)
-            print("Weights downloaded successfully!")
-        else:
-            print("Failed to download weights file. Status code:", response.status_code)
-    else:
-        print("Weights already exists!")
-
-    model, transform, net_w, net_h = load_model(device, weights_de, model_type, optimize=False, height=640, square=False)
+    #model_type = 'dpt_large_384' # baseline model (~3FPS, better accuracy)
+    weights_DE = get_midas_weights(model_type)
+    model, transform, net_w, net_h = load_model(device, weights_DE, model_type, optimize=False, height=640, square=False)
 
 
     # Warmup models
@@ -291,7 +300,7 @@ def run(
                 image = image[None]  # expand for batch dim
 
         # Depth estimation
-        depth = get_depth(im0, transform, device, model, model_type, net_w, net_h, vis=True, sides=True)
+        depth = get_depth(im0, transform, device, model, model_type, net_w, net_h)
         print(f'Depth {depth.shape}, min {depth.min()}, max {depth.max()}')
 
         # Object detection inference
@@ -346,10 +355,12 @@ def run(
         # Display results
         im0 = annotator.result()
         if view_img:
-            #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
+            #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
             cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
-            cv2.imshow(str(p), im0)
-            #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
+            #cv2.imshow("AIBox", im0) # original image only
+            side_by_side = create_side_by_side(im0, depth, False) # original image & depth side-by-side
+            cv2.imshow("AIBox & Depth", side_by_side)
+            #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -415,7 +426,7 @@ def run(
                     navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             else:
                 horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+                    navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
                 target_entered = False
@@ -447,7 +458,7 @@ def run(
                     navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             else:
                 horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+                    navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
 
             # Exit the loop if grasp signal was sent and set index of the next element from the list
             if grasp and ((obj_index+1)<=len(target_objs)):
@@ -481,7 +492,7 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
 
