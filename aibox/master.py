@@ -235,12 +235,12 @@ def run(
 
         # Non-maximal supression
         with dt[2]:
-            pred_target = non_max_suppression(pred_target, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det) # list of (n,6) tensors
-            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det) # list of (n,6) tensors
+            pred_target = non_max_suppression(pred_target, conf_thres, iou_thres, classes_obj, agnostic_nms, max_det=max_det) # list containing one tensor (n,6)
+            pred_hand = non_max_suppression(pred_hand, conf_thres, iou_thres, classes_hand, agnostic_nms, max_det=max_det) # list containing one tensor (n,6)
 
-        for hand in pred_hand:
+        for hand in pred_hand[0]:
             if len(hand):
-                hand[0,5] += index_add # assign correct classID by adding len(coco_labels)
+                hand[5] += index_add # assign correct classID by adding len(coco_labels)
 
         # Camera motion compensation for tracker (ECC)
         curr_frames = im0
@@ -252,20 +252,15 @@ def run(
         clss = torch.empty(0)
 
         # Process object detections
-        preds = [torch.cat((target,hand)) for target, hand in zip(pred_target, pred_hand)]
-        for det in preds:
-            det[:4] = scale_boxes(im.shape[2:], det[:4], im0.shape).round()
-            xywhs = xyxy2xywh(det[:, 0:4])
-            confs = det[:, 4]
-            clss = det[:, 5]
+        preds = torch.cat((pred_target[0], pred_hand[0]), dim=0)
+        if len(preds) > 0:
+            preds[:, :4] = scale_boxes(im.shape[2:], preds[:, :4], im0.shape).round()
+            xywhs = xyxy2xywh(preds[:, :4])
+            confs = preds[:, 4]
+            clss = preds[:, 5]
 
         # Generate tracker outputs for navigation
-        outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0)
-        
-        """
-        for track in tracker.tracker.tracks:
-            print(track.mean[:4], track.track_id, track.class_id, float(track.conf), track.state)
-        """
+        outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
 
         # Get FPS
         end = time.perf_counter()
@@ -351,10 +346,10 @@ def run(
 
         # Navigate the hand based on information from last frame and current frame detections
         if frame == 0: # Initialize navigation
-            horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
+            horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
             navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav)
 
-        horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, obj_track_id, hand_track_id  = \
+        horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
             navigate_hand(belt_controller,
                           outputs,
                           class_target_obj,
@@ -367,9 +362,7 @@ def run(
                           count_searching,
                           count_see_object,
                           jitter_guard,
-                          navigating,
-                          obj_track_id,
-                          hand_track_id)
+                          navigating)
     
         # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if grasp:

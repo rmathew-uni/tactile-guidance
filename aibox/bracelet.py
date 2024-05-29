@@ -79,7 +79,11 @@ def start_listener():
 
 def choose_detection(bboxes, previous_bbox=None):
     # Hyperparameters
-    # ...
+    track_id_weight = np.inf
+    exponential_weight = 2
+    distance_weight = 100
+
+    print(f'\nPrevious BB: {previous_bbox}')
 
     candidates = []
     for bbox in bboxes: # x, y, w, h, id, cls, conf
@@ -87,22 +91,26 @@ def choose_detection(bboxes, previous_bbox=None):
         if bbox[0] <= w and bbox[1] <= h:
             # confidence score
             confidence = bbox[6] # in [0,1]
-            confidence_score = 2**confidence - 1 # exponential growth in [0,1], could also use np.exp() and normalize
+            confidence_score = exponential_weight**confidence - 1 # exponential growth in [0,1], could also use np.exp() and normalize
             # tracking score
             current_track_id = bbox[4]
             previous_track_id = previous_bbox[4] if previous_bbox is not None else -1
-            track_id_score = np.inf if current_track_id == previous_track_id else 1 # 1|ꝏ
+            track_id_score = track_id_weight if current_track_id == previous_track_id else 1 # 1|ꝏ
             # distance score
             if previous_bbox is None:
+                distance = None
                 distance_inverted = 1
             else:
                 current_location = bbox[:2]
                 previous_location = previous_bbox[:2]
                 distance = np.linalg.norm(current_location - previous_location)
-                distance_inverted = 1 / distance if distance >= 1 else 100
+                distance_inverted = 1 / distance if distance >= 1 else distance_weight
 
             # total score
             score = track_id_score * confidence_score * distance_inverted
+            print(f'Current BB: {bbox}')
+            print(f'TrackID = {current_track_id}, confidence = {confidence}, distance = {distance}')
+            print(f'Score {score} = {track_id_score} * {confidence_score} * {distance_inverted}')
             # Possible scores:
             # ꝏ -- same trackingID
             # 100 -- different trackingID, matching BBs (max. 1px deviation), conf=1
@@ -138,9 +146,7 @@ def navigate_hand(
         count_searching: int = 0, 
         count_see_object: int = 0, 
         jitter_guard: int = 0, 
-        navigating: bool = False,
-        prev_obj_track_id: int = -1,
-        prev_hand_track_id: int = -1
+        navigating: bool = False
         ):
     
     '''
@@ -184,57 +190,14 @@ def navigate_hand(
 
     # Search for object and hand with the highest prediction confidence
     # Filter for hand detections
-    curr_hand_track_id = int(prev_hand_track_id)
-
     bboxes_hands = [detection for detection in bboxes if detection[5] in search_key_hand]
-    hand_true = choose_detection(bboxes_hands, prev_hand)
-
-    for bbox in bboxes_hands:
-        if bbox[0] < w and bbox[1] < h:
-            # If hand was previously tracked - continue guidance towards it
-            if bbox[4] == prev_hand_track_id:
-                hand = bbox[0:4]
-                break
-            # Otherwise search for the hand with maximum confidence
-            elif bbox[6] > min_hand_confidence:
-                hand = bbox[0:4]
-                curr_hand_track_id = int(bbox[4])
-
-    if hand_true is not None:
-        print()
-        print(f'Previous hand: {prev_hand}')
-        print(f'Current hand: {hand_true}')
-        print(f'Old hand: {hand}')
-        print(f'Same hand? {np.array_equal(hand, hand_true[:4])}')
-    prev_hand = hand_true
+    hand = choose_detection(bboxes_hands, prev_hand)
+    prev_hand = hand
 
     # Filter for target detections
-    curr_obj_track_id = int(prev_obj_track_id)
-
     bboxes_objects = [detection for detection in bboxes if detection[5] == search_key_obj]
-    target_true = choose_detection(bboxes_objects, prev_target)
-    
-    for bbox in bboxes_objects:
-        if bbox[0] < w and bbox[1] < h:
-            # If target was previously tracked - continue guidance towards it
-            if bbox[4] == prev_obj_track_id:
-                target = bbox[0:4]
-                break
-            # Otherwise search for the target with maximum confidence
-            elif bbox[6] > min_obj_confidence:
-                target = bbox[0:4]
-                curr_obj_track_id = int(bbox[4])
-
-    if target_true is not None:
-        print()
-        print(f'Previous target: {prev_target}')
-        print(f'Current target: {target_true}')
-        print(f'Old target: {target}')
-        print(f'Same target? {np.array_equal(target, target_true[:4])}')
-    prev_target = target_true
-    
-
-    #print(f'Current track id of the target: {curr_obj_track_id}')
+    target = choose_detection(bboxes_objects, prev_target)
+    prev_target = target
 
     # Getting horizontal and vertical position of the bounding box around target object and hand
     if hand is not None:
@@ -290,7 +253,7 @@ def navigate_hand(
 
         grasp = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 2. Guidance: If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
@@ -337,7 +300,7 @@ def navigate_hand(
             else:
                 vertical = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 3. Lost target: If the camera cannot see the hand or the object, tell them they need to move around
@@ -378,7 +341,7 @@ def navigate_hand(
                 search = False
                 count_searching = 0
             
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 4. Lost hand: If the camera cannot see the hand but the object is visible, tell them to move the hand around
@@ -420,9 +383,9 @@ def navigate_hand(
                 obj_seen_prev = False
                 count_see_object = 0
         
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
     else:
         print('Condition not covered by logic. Maintaining variables and standing by.')
         grasp = False
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id
+        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
