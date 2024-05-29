@@ -44,6 +44,7 @@ from MiDaS.run import create_side_by_side, process
 
 # Navigation
 from bracelet import navigate_hand, connect_belt
+from bracelet import navigate_hand, connect_belt
 
 # Utility
 import keyboard
@@ -74,6 +75,40 @@ def close_app(controller):
         thread._stop()
     controller.disconnect_belt() if controller else None
     sys.exit()
+
+
+def get_midas_weights(model_type):
+
+    path = f'./MiDaS/weights/{model_type}.pt'
+
+    # Download weights if not available
+    if not os.path.exists(path):
+        print("File does not exist. Downloading weights...")
+
+        # Get version from model type
+        if 'v21' in model_type:
+            version = 'v2_1'
+        elif model_type == 'dpt_large_384' or model_type == 'dpt_hybrid_384':
+            version = 'v3'
+        else:
+            print('Fallback to latest version V3.1 (May 2024).')
+            version = 'v3_1'
+        
+        # Create and download from URL
+        url = f'https://github.com/isl-org/MiDaS/releases/download/{version}/{model_type}.pt'
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(path, 'wb') as file:
+                file.write(response.content)
+            print("Weights downloaded successfully!")
+        else:
+            print("Failed to download weights file. Status code:", response.status_code)
+    else:
+        print("Weights already exists!")
+
+    weights = f'./MiDaS/weights/{model_type}.pt'
+
+    return weights
 
 
 def get_midas_weights(model_type):
