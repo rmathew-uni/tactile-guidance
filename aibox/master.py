@@ -43,7 +43,7 @@ from MiDaS.midas.model_loader import default_models, load_model
 from MiDaS.run import create_side_by_side, process
 
 # Navigation
-from bracelet import navigate_hand, mock_navigate_hand, connect_belt
+from bracelet import navigate_hand, connect_belt
 
 # Utility
 import keyboard
@@ -426,7 +426,7 @@ def run(
                     navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             else:
                 horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+                    navigate_hand(outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasp:
                 target_entered = False
@@ -458,7 +458,7 @@ def run(
                     navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
             else:
                 horizontal_out, vertical_out, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating, curr_obj_track_id, curr_hand_track_id = \
-                    mock_navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
+                    navigate_hand(outputs, class_target_obj, class_hand_nav, curr_obj_track_id, curr_hand_track_id, horizontal_in, vertical_in, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating)
 
             # Exit the loop if grasp signal was sent and set index of the next element from the list
             if grasp and ((obj_index+1)<=len(target_objs)):
