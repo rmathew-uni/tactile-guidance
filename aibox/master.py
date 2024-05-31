@@ -111,6 +111,7 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
         manual_entry=False, # True means you will control the exp manually versus the standard automatic running
+        run_object_tracker=True # True means that the object tracker model will be initialized and used
 ):
 
     # region main setup
@@ -176,24 +177,29 @@ def run(
     master_label = names_obj | labels_hand_adj
 
     # Load tracker model
-    print(f'LOADING OBJECT TRACKER')
-    tracker = StrongSORT(
-            model_weights=weights_tracker, 
-            device=device,
-            fp16=False,
-            max_dist=0.5,          # The matching threshold. Samples with larger distance are considered an invalid match
-            max_iou_distance=0.7,  # Gating threshold. Associations with cost larger than this value are disregarded.
-            max_age=70,            # Maximum number of missed misses (prediction calls, i.e. frames I think) before a track is deleted
-            n_init=1,              # Number of frames that a track remains in initialization phase --> if 0, track is confirmed on first detection
-            nn_budget=100,         # Maximum size of the appearance descriptors gallery
-            mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
-            ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
-            )
+    if run_object_tracker:
+        print(f'LOADING OBJECT TRACKER')
+        tracker = StrongSORT(
+                model_weights=weights_tracker, 
+                device=device,
+                fp16=False,
+                max_dist=0.5,          # The matching threshold. Samples with larger distance are considered an invalid match
+                max_iou_distance=0.7,  # Gating threshold. Associations with cost larger than this value are disregarded.
+                max_age=70,            # Maximum number of missed misses (prediction calls, i.e. frames I think) before a track is deleted
+                n_init=1,              # Number of frames that a track remains in initialization phase --> if 0, track is confirmed on first detection
+                nn_budget=100,         # Maximum size of the appearance descriptors gallery
+                mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
+                ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
+                )
+    
+    else:
+        print('SKIPPING OBJECT TRACKER INITIALIZATION')
 
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
-    tracker.model.warmup()
+    if run_object_tracker:
+        tracker.model.warmup()
 
     # endregion
 
@@ -243,8 +249,9 @@ def run(
                 hand[5] += index_add # assign correct classID by adding len(coco_labels)
 
         # Camera motion compensation for tracker (ECC)
-        curr_frames = im0
-        tracker.tracker.camera_update(prev_frames, curr_frames)
+        if run_object_tracker:
+            curr_frames = im0
+            tracker.tracker.camera_update(prev_frames, curr_frames)
         
         # Initialize/clear detections
         xywhs = torch.empty(0,4)
@@ -260,7 +267,8 @@ def run(
             clss = preds[:, 5]
 
         # Generate tracker outputs for navigation
-        outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
+        if run_object_tracker:
+            outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
 
         # Get FPS
         end = time.perf_counter()
@@ -339,7 +347,7 @@ def run(
                 target_obj_verb = target_objs[obj_index]
                 class_target_obj = next(key for key, value in coco_labels.items() if value == target_obj_verb)
                 file = f'resources/sound/{target_obj_verb}.mp3'
-                playsound(str(file))
+                #playsound(str(file))
                 # Start trial time measure (end in navigate_hand(...))
 
             target_entered = True
@@ -383,6 +391,8 @@ if __name__ == '__main__':
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
 
+    run_object_tracker = True
+
     print(f'\nLOADING CAMERA AND BRACELET')
 
     # Check camera connection
@@ -403,7 +413,7 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, nosave=True)
+        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, run_object_tracker=run_object_tracker, nosave=True)
         close_app(belt_controller)
     except KeyboardInterrupt:
         close_app(belt_controller)
