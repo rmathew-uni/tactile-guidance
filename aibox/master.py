@@ -108,7 +108,7 @@ def get_midas_weights(model_type):
     return weights
 
 
-def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=False, sides=False):
+def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=False, sides=False, bbs=None):
     """
     Depth Estimation with MiDaS.
     """
@@ -125,16 +125,21 @@ def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=Fal
         content = create_side_by_side(original_image_bgr, depth, False)
         cv2.imshow('MiDaS Depth Estimation', content/255)
 
-    return depth
+    if bbs is not None:
+        outputs = []
+        for bb in bbs:
+            x,y,w,h = xyxy2xywh(bb[:4])
+            left_edge = int(x - (w//2))
+            right_edge = int(x + (w//2))
+            top_edge = int(y - (h//2))
+            bottom_edge = int(y + (h//2))
+            roi = depth[left_edge:right_edge, top_edge:bottom_edge]
+            mean_depth = np.mean(roi)
+            median_depth = np.median(roi) # probably works better
+            bb = np.append(bb, mean_depth)
+            outputs.append(bb)
 
-
-def xyxy_to_xywh(bb):
-    x1, y1, x2, y2 = bb
-    w = abs(x2 - x1)
-    h = abs(y2 - y1)
-    x = x1 + w//2
-    y = y1 + h//2
-    return [x, y, w, h]
+    return depth, np.array(outputs)
 
 # endregion
 
@@ -331,13 +336,20 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
             confs = preds[:, 4]
             clss = preds[:, 5]
 
-        # Depth estimation
-        depth = get_depth(im0, transform, device, model, model_type, net_w, net_h)
-        print(f'Depth {depth.shape}, min {depth.min()}, max {depth.max()}')
-
         # Generate tracker outputs for navigation
         if run_object_tracker:
             outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
+        else:
+            outputs = preds.cpu()
+            track_id = np.full((outputs.shape[0], 1), -1)
+            outputs = np.insert(outputs, 4, track_id, axis=1) # insert track_id placeholder
+            dpth = np.full((outputs.shape[0], 1), -1) # insert depth placeholder
+            outputs = np.append(outputs, dpth, axis=1)
+            outputs[:, [5, 6]] = outputs[:, [6, 5]] # switch cls and conf columns for alignment with tracker
+            print(outputs)
+
+        # Depth estimation
+        depth_img, outputs = get_depth(im0, transform, device, model, model_type, net_w, net_h, vis=False, bbs=outputs)
 
         # Get FPS
         end = time.perf_counter()
@@ -348,10 +360,10 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
 
         # region visualization
         # Write results
-        for *xyxy, obj_id, cls, conf in outputs:
+        for *xyxy, obj_id, cls, conf, depth in outputs:
             id, cls = int(obj_id), int(cls)
             if save_img or save_crop or view_img:
-                label = None if hide_labels else (f'ID: {id} {master_label[cls]}' if hide_conf else (f'ID: {id} {master_label[cls]} {conf:.2f}'))
+                label = None if hide_labels else (f'ID: {id} {master_label[cls]}' if hide_conf else (f'ID: {id} {master_label[cls]} {conf:.2f} {depth:.2f}'))
                 annotator.box_label(xyxy, label, color=colors(cls, True))
 
         # Display results
@@ -360,7 +372,7 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
             #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
             cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
             #cv2.imshow("AIBox", im0) # original image only
-            side_by_side = create_side_by_side(im0, depth, False) # original image & depth side-by-side
+            side_by_side = create_side_by_side(im0, depth_img, False) # original image & depth side-by-side
             cv2.imshow("AIBox & Depth", side_by_side)
             #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
             if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -390,7 +402,7 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
         # Convert BBs after display
         if len(outputs) > 0:
             for det in range(len(outputs)):
-                outputs[det, :4] = xyxy_to_xywh(outputs[det, :4])
+                outputs[det, :4] = xyxy2xywh(outputs[det, :4])
 
         # endregion
 
@@ -461,7 +473,7 @@ if __name__ == '__main__':
     source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
-    run_object_tracker = True
+    run_object_tracker = False
 
     print(f'\nLOADING CAMERA AND BRACELET')
 
