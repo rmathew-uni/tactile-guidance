@@ -79,7 +79,7 @@ def start_listener():
 
 def choose_detection(bboxes, previous_bbox=None):
     # Hyperparameters
-    track_id_weight = np.inf
+    track_id_weight = 1000
     exponential_weight = 2
     distance_weight = 100
 

@@ -118,7 +118,7 @@ def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=Fal
     img_resized = transform({"image": img})["image"]
 
     depth = process(device, model, model_type, img_resized, (net_w, net_h),
-                            image.shape[1::-1], False, True)
+                            image.shape[1::-1], False, True) # webcam: (720,1280)
 
     if vis:
         original_image_bgr = np.flip(image, 2) if sides else None
@@ -128,14 +128,11 @@ def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=Fal
     if bbs is not None:
         outputs = []
         for bb in bbs:
-            x,y,w,h = xyxy2xywh(bb[:4])
-            left_edge = int(x - (w//2))
-            right_edge = int(x + (w//2))
-            top_edge = int(y - (h//2))
-            bottom_edge = int(y + (h//2))
-            roi = depth[left_edge:right_edge, top_edge:bottom_edge]
+            x,y,x2,y2 = [int(coord) for coord in bb[:4]]
+            roi = depth[y:y2, x:x2]
             mean_depth = np.mean(roi)
             median_depth = np.median(roi) # probably works better
+            print(f'Mean depth: {mean_depth}, Median depth: {median_depth}')
             bb = np.append(bb, mean_depth)
             outputs.append(bb)
 
@@ -340,13 +337,9 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
         if run_object_tracker:
             outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
         else:
-            outputs = preds.cpu()
-            track_id = np.full((outputs.shape[0], 1), -1)
-            outputs = np.insert(outputs, 4, track_id, axis=1) # insert track_id placeholder
-            dpth = np.full((outputs.shape[0], 1), -1) # insert depth placeholder
-            outputs = np.append(outputs, dpth, axis=1)
+            outputs = np.array(preds)
+            outputs = np.insert(outputs, 4, -1, axis=1) # insert track_id placeholder
             outputs[:, [5, 6]] = outputs[:, [6, 5]] # switch cls and conf columns for alignment with tracker
-            print(outputs)
 
         # Depth estimation
         depth_img, outputs = get_depth(im0, transform, device, model, model_type, net_w, net_h, vis=False, bbs=outputs)
@@ -470,7 +463,7 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
+    source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
     run_object_tracker = False
