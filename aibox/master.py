@@ -181,12 +181,10 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
         target_objs = ['bottle' for _ in range(5)] # debugging
         obj_index = 0
-        gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
     else:
         print('The experiment will be run manually. You will enter the desired target for each run yourself.')
 
-    horizontal_in, vertical_in = False, False
     target_entered = False
     play_start()  # play welcome sound
 
@@ -446,7 +444,6 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
     
         # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if grasp:
-            gave_command = False #?
             if manual_entry and ((obj_index+1)<=len(target_objs)):
                 obj_index += 1
             target_entered = False
