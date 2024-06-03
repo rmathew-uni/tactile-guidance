@@ -10,6 +10,7 @@ This script is using code from the following sources:
 
 # System
 import os
+import requests
 import platform
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ file = Path(__file__).resolve()
 root = file.parents[0]
 sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
+sys.path.append(str(root) + '/MiDaS')
 
 # Object tracking
 import torch
@@ -33,6 +35,10 @@ from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, c
 from yolov5.utils.plots import Annotator, colors, save_one_box
 from yolov5.utils.torch_utils import select_device, smart_inference_mode
 from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
+
+# DE
+from MiDaS.midas.model_loader import default_models, load_model
+from MiDaS.run import create_side_by_side, process
 
 # Navigation
 from bracelet import navigate_hand, connect_belt
@@ -66,6 +72,60 @@ def close_app(controller):
         thread._stop()
     controller.disconnect_belt() if controller else None
     sys.exit()
+
+
+def get_midas_weights(model_type):
+
+    path = f'./MiDaS/weights/{model_type}.pt'
+
+    # Download weights if not available
+    if not os.path.exists(path):
+        print("File does not exist. Downloading weights...")
+
+        # Get version from model type
+        if 'v21' in model_type:
+            version = 'v2_1'
+        elif model_type == 'dpt_large_384' or model_type == 'dpt_hybrid_384':
+            version = 'v3'
+        else:
+            print('Fallback to latest version V3.1 (May 2024).')
+            version = 'v3_1'
+        
+        # Create and download from URL
+        url = f'https://github.com/isl-org/MiDaS/releases/download/{version}/{model_type}.pt'
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(path, 'wb') as file:
+                file.write(response.content)
+            print("Weights downloaded successfully!")
+        else:
+            print("Failed to download weights file. Status code:", response.status_code)
+    else:
+        print("Weights already exists!")
+
+    weights = f'./MiDaS/weights/{model_type}.pt'
+
+    return weights
+
+
+def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=False, sides=False):
+    """
+    Depth Estimation with MiDaS.
+    """
+    if image.max() > 1:
+        img = np.flip(image, 2)  # in [0, 255] (flip required to get RGB)
+        img = img/255
+    img_resized = transform({"image": img})["image"]
+
+    depth = process(device, model, model_type, img_resized, (net_w, net_h),
+                            image.shape[1::-1], False, True)
+
+    if vis:
+        original_image_bgr = np.flip(image, 2) if sides else None
+        content = create_side_by_side(original_image_bgr, depth, False)
+        cv2.imshow('MiDaS Depth Estimation', content/255)
+
+    return depth
 
 
 def xyxy_to_xywh(bb):
@@ -111,6 +171,7 @@ def run(
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride_obj
         manual_entry=False, # True means you will control the exp manually versus the standard automatic running
+        mock_navigate=True # True means that navigation will be conducted only via print commands without connecting the bracelet
 ):
 
     # region main setup
@@ -120,6 +181,7 @@ def run(
         target_objs = ['apple','banana','potted plant','bicycle','cup','clock','wine glass']
         target_objs = ['bottle' for _ in range(5)] # debugging
         obj_index = 0
+        gave_command = False
         print(f'The experiment will be run automatically. The selected target objects, in sequence, are:\n{target_objs}')
     else:
         print('The experiment will be run manually. You will enter the desired target for each run yourself.')
@@ -190,6 +252,13 @@ def run(
             ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
             )
 
+    # Load depth estimator
+    print(f'\nLOADING DEPTH ESTIMATOR')
+    model_type = 'midas_v21_small_256' # smallest and fastest model
+    #model_type = 'dpt_large_384' # baseline model (~3FPS, better accuracy)
+    weights_DE = get_midas_weights(model_type)
+    model, transform, net_w, net_h = load_model(device, weights_DE, model_type, optimize=False, height=640, square=False)
+
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
     model_hand.warmup(imgsz=(1 if pt_hand or model_hand.triton else bs, 3, *imgsz))
@@ -259,6 +328,10 @@ def run(
             confs = preds[:, 4]
             clss = preds[:, 5]
 
+        # Depth estimation
+        depth = get_depth(im0, transform, device, model, model_type, net_w, net_h)
+        print(f'Depth {depth.shape}, min {depth.min()}, max {depth.max()}')
+
         # Generate tracker outputs for navigation
         outputs = tracker.update(xywhs.cpu(), confs.cpu(), clss.cpu(), im0) # returns xyxys again
 
@@ -267,7 +340,6 @@ def run(
         runtime = end - start
         fps = 1 / runtime
         fpss.append(fps)
-        #print(f'Frame: {frame}, Average FPS: {int(np.mean(fpss))}, Device: {device}')
         prev_frames = curr_frames
 
         # region visualization
@@ -281,10 +353,12 @@ def run(
         # Display results
         im0 = annotator.result()
         if view_img:
-            #cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
+            #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
             cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
-            cv2.imshow(str(p), im0)
-            #cv2.resizeWindow(str(p), im0.shape[1]//2, im0.shape[0]//2) # for resizing
+            #cv2.imshow("AIBox", im0) # original image only
+            side_by_side = create_side_by_side(im0, depth, False) # original image & depth side-by-side
+            cv2.imshow("AIBox & Depth", side_by_side)
+            #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
@@ -366,6 +440,7 @@ def run(
     
         # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
         if grasp:
+            gave_command = False #?
             if manual_entry and ((obj_index+1)<=len(target_objs)):
                 obj_index += 1
             target_entered = False
@@ -376,6 +451,7 @@ def run(
 if __name__ == '__main__':
 
     #check_requirements(requirements='../requirements.txt', exclude=('tensorboard', 'thop'))
+    
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
