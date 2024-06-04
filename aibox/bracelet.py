@@ -140,7 +140,8 @@ def navigate_hand(
         search_key_obj: str, 
         search_key_hand: list,
         hor_correct: bool = False, 
-        ver_correct: bool = False, 
+        ver_correct: bool = False,
+        dist_correct: bool = False, 
         grasp: bool = False, 
         obj_seen_prev: bool = False, 
         search: bool = False, 
@@ -177,7 +178,7 @@ def navigate_hand(
     min_hand_confidence = 0.5
     min_obj_confidence = 0.5
     hand, target = None, None
-    horizontal, vertical = False, False
+    horizontal, vertical, dist = False, False, True
     w,h = 1920, 1080
 
     if belt_controller:
@@ -221,7 +222,7 @@ def navigate_hand(
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
-    if hand is not None and hor_correct and ver_correct:
+    if hand is not None and hor_correct and ver_correct and dist_correct:
         obj_seen_prev = False
         search = False
         count_searching = 0
@@ -258,7 +259,7 @@ def navigate_hand(
 
         grasp = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 2. Guidance: If the camera can see both hand and object but not yet aligned, navigate the hand to the object, horizontal first
@@ -305,7 +306,7 @@ def navigate_hand(
             else:
                 vertical = True
 
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 3. Lost target: If the camera cannot see the hand or the object, tell them they need to move around
@@ -346,7 +347,7 @@ def navigate_hand(
                 search = False
                 count_searching = 0
             
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
 
 
     # 4. Lost hand: If the camera cannot see the hand but the object is visible, tell them to move the hand around
@@ -388,9 +389,9 @@ def navigate_hand(
                 obj_seen_prev = False
                 count_see_object = 0
         
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
     
     else:
         print('Condition not covered by logic. Maintaining variables and standing by.')
         grasp = False
-        return horizontal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating
+        return horizontal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating

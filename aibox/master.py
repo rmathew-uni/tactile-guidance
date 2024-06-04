@@ -428,16 +428,17 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL
 
         # Navigate the hand based on information from last frame and current frame detections
         if frame == 0: # Initialize navigation
-            horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+            horizonal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
             navigate_hand(belt_controller, outputs, class_target_obj, class_hand_nav)
 
-        horizonal, vertical, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
+        horizonal, vertical, dist, grasp, obj_seen_prev, search, count_searching, count_see_object, jitter_guard, navigating = \
             navigate_hand(belt_controller,
                           outputs,
                           class_target_obj,
                           class_hand_nav,
                           horizonal,
                           vertical,
+                          dist,
                           grasp,
                           obj_seen_prev,
                           search,
