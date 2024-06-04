@@ -174,7 +174,6 @@ def navigate_hand(
     global prev_hand, prev_target
 
     # Navigation vars
-    vibration_intensity = 100
     min_hand_confidence = 0.5
     min_obj_confidence = 0.5
     hand, target = None, None
@@ -214,6 +213,11 @@ def navigate_hand(
         target_right_bound = target[0] + target_width//2
         target_lower_bound = target[1] + target_height//2
         target_upper_bound = target[1] - target_height//2
+
+    # Use depth information for guidance via vibration intensity modulation
+    distance = np.abs(target[7] - hand[7])
+    vibration_intensity = min(10000 / distance, 100) # d=10 -> 100, d=1000 -> 10
+    print(f'Distance: {distance}. Intensity: {vibration_intensity}.')
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)

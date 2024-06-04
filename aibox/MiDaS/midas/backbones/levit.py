@@ -28,9 +28,20 @@ def _make_levit_backbone(
     pretrained = nn.Module()
 
     pretrained.model = model
+
     pretrained.model.blocks[hooks[0]].register_forward_hook(get_activation("1"))
     pretrained.model.blocks[hooks[1]].register_forward_hook(get_activation("2"))
     pretrained.model.blocks[hooks[2]].register_forward_hook(get_activation("3"))
+    
+    """
+    # Try to resolve "AttributeError object has no attribute 'blocks'" (https://github.com/isl-org/MiDaS/issues/225) -- failed
+    hooks=[3, 7, 11] # change to last output in each block
+    for stage in range(len(pretrained.model.stages)): # 3 stages architecture by default
+        #pretrained.model.stages[stage].blocks[hooks[stage]].register_forward_hook(get_activation(str(stage + 1)))
+        hook = int(((hooks[stage]+1)/(stage+1)) - 1) # divide by stages to get last block
+        print(f'Stage {stage}, num blocks {len(pretrained.model.stages[stage].blocks)}, old hook {hooks[stage]}, new hook {hook}')
+        pretrained.model.stages[stage].blocks[hook].register_forward_hook(get_activation(str(stage + 1)))
+    """
 
     pretrained.activations = activations
 

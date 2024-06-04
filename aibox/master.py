@@ -141,10 +141,11 @@ def get_depth(image, transform, device, model, model_type, net_w, net_h, vis=Fal
 # endregion
 
 @smart_inference_mode()
-def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
-        weights_hand='hand.pt',  # model_obj path or triton URL # ROOT
-        weights_tracker='osnet_x0_25_market1501.pt', # ROOT
-        source='data/images',  # file/dir/URL/glob/screen/0(webcam) # ROOT
+def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL
+        weights_hand='hand.pt',  # model_obj path or triton URL
+        weights_tracker='osnet_x0_25_market1501.pt', 
+        depth_estimator='midas_v21_small_256',
+        source='data/images',  # file/dir/URL/glob/screen/0(webcam)
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -162,7 +163,7 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
         augment=False,  # augmented inference
         visualize=False,  # visualize features
         update=False,  # update all models
-        project='runs/detect',  # save results to project/name # ROOT
+        project='runs/detect',  # save results to project/name 
         name='video',  # save results to project/name
         exist_ok=False,  # existing project/name ok, do not increment
         line_thickness=3,  # bounding box thickness (pixels)
@@ -257,10 +258,8 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
 
     # Load depth estimator
     print(f'\nLOADING DEPTH ESTIMATOR')
-    model_type = 'midas_v21_small_256' # smallest and fastest model
-    #model_type = 'dpt_large_384' # baseline model (~3FPS, better accuracy)
-    weights_DE = get_midas_weights(model_type)
-    model, transform, net_w, net_h = load_model(device, weights_DE, model_type, optimize=False, height=640, square=False)
+    weights_DE = get_midas_weights(depth_estimator)
+    model, transform, net_w, net_h = load_model(device, weights_DE, depth_estimator, optimize=False, height=640, square=False)
 
     # Warmup models
     model_obj.warmup(imgsz=(1 if pt_obj or model_obj.triton else bs, 3, *imgsz))
@@ -342,7 +341,7 @@ def run(weights_obj='yolov5s.pt',  # model_obj path or triton URL # ROOT
             outputs[:, [5, 6]] = outputs[:, [6, 5]] # switch cls and conf columns for alignment with tracker
 
         # Depth estimation
-        depth_img, outputs = get_depth(im0, transform, device, model, model_type, net_w, net_h, vis=False, bbs=outputs)
+        depth_img, outputs = get_depth(im0, transform, device, model, depth_estimator, net_w, net_h, vis=False, bbs=outputs)
 
         # Get FPS
         end = time.perf_counter()
@@ -463,10 +462,12 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
+    depth_estimator = 'midas_v21_small_256' # depth estimator model type (weights are loaded automatically!), 
+                                      # e.g.'midas_v21_small_256', ('dpt_levit_224', 'dpt_swin2_tiny_256',) 'dpt_large_384'
     source = '0' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
-    run_object_tracker = False
+    run_object_tracker = True
 
     print(f'\nLOADING CAMERA AND BRACELET')
 
@@ -488,8 +489,13 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        run(weights_obj=weights_obj, weights_hand=weights_hand, weights_tracker=weights_tracker, source=source, run_object_tracker=run_object_tracker, nosave=True)
-        close_app(belt_controller)
+        run(weights_obj=weights_obj, 
+            weights_hand=weights_hand, 
+            weights_tracker=weights_tracker, 
+            depth_estimator=depth_estimator,
+            source=source, 
+            run_object_tracker=run_object_tracker, 
+            nosave=True)
     except KeyboardInterrupt:
         close_app(belt_controller)
     
