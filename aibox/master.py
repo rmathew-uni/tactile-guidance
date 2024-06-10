@@ -9,14 +9,8 @@ This script is using code from the following sources:
 # region Setup
 
 # System
-import os
-import requests
-import platform
 import sys
 from pathlib import Path
-import itertools
-import time
-import numpy as np
 
 # Use the project file packages instead of the conda packages, i.e. add to system path for import
 file = Path(__file__).resolve()
@@ -25,23 +19,7 @@ sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
 sys.path.append(str(root) + '/MiDaS')
 
-# Object tracking
-import torch
-from labels import coco_labels # COCO labels dictionary
-from yolov5.models.common import DetectMultiBackend
-from yolov5.utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
-from yolov5.utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
-from yolov5.utils.plots import Annotator, colors, save_one_box
-from yolov5.utils.torch_utils import select_device, smart_inference_mode
-from strongsort.strong_sort import StrongSORT # there is also a pip install, but it has multiple errors
-
-# DE
-from MiDaS.midas.model_loader import default_models, load_model
-from MiDaS.run import create_side_by_side, process
-
 # Navigation
-from bracelet import navigate_hand, connect_belt
 import controller
 
 # Utility
@@ -64,6 +42,8 @@ def play_start():
 
 # endregion
 
+# region Main
+
 if __name__ == '__main__':
 
     #check_requirements(requirements='../requirements.txt', exclude=('tensorboard', 'thop'))
@@ -74,7 +54,7 @@ if __name__ == '__main__':
     depth_estimator = 'midas_v21_small_256' # depth estimator model type (weights are loaded automatically!), 
                                       # e.g.'midas_v21_small_256', ('dpt_levit_224', 'dpt_swin2_tiny_256',) 'dpt_large_384'
     source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
-    mock_navigate = False # Navigate without the bracelet using only print commands
+    mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
     run_object_tracker = True
     run_depth_estimator = True
@@ -144,3 +124,5 @@ if __name__ == '__main__':
     
     # In the end, kill everything
     controller.close_app(belt_controller)
+
+# endregion

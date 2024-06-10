@@ -504,11 +504,6 @@ if __name__ == '__main__':
                             belt_controller=belt_controller,
                             target_objs = ['bottle' for _ in range(5)]) # debugging
 
-    print(bracelet_controller.imgsz)
-    print(bracelet_controller.target_objs)
-
-    #obj.run()
-
     try:
         bracelet_controller.run()
     except KeyboardInterrupt:
