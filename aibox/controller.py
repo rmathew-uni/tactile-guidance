@@ -1,3 +1,5 @@
+# region Setup
+
 # System
 import os
 import platform
@@ -34,6 +36,20 @@ from MiDaS.run import create_side_by_side, process
 
 # Navigation
 from bracelet import navigate_hand, connect_belt
+
+# endregion
+
+# region Helpers
+
+def playstart():
+    file = 'resources/sound/beginning.mp3' # ROOT
+    playsound(str(file))
+
+
+def play_start():
+    play_start_thread = threading.Thread(target=playstart, name='play_start')
+    play_start_thread.start()
+
 
 def get_midas_weights(model_type):
 
@@ -110,6 +126,9 @@ def close_app(controller):
     controller.disconnect_belt() if controller else None
     sys.exit()
 
+# endregion
+
+# region BraceletController class
 
 class AutoAssign:
 
@@ -124,6 +143,8 @@ class BraceletController(AutoAssign):
     def __init__(self, **kwargs):
         
         super().__init__(**kwargs)
+
+# region models loaders
 
     def load_object_detector(self):
         
@@ -185,6 +206,10 @@ class BraceletController(AutoAssign):
         
         if type == 'tracker':
             model.warmup()
+
+# endregion
+
+# region experiment loop
 
     def experiment_loop(self, save_dir, save_img, index_add, vid_path, vid_writer):
 
@@ -371,6 +396,7 @@ class BraceletController(AutoAssign):
                     self.obj_index += 1
                 self.target_entered = False
 
+# endregion
 
     @smart_inference_mode()
     def run(self):
@@ -452,6 +478,10 @@ class BraceletController(AutoAssign):
         # Start experiment loop
         self.experiment_loop(save_dir, save_img, index_add, vid_path, vid_writer)
 
+# endregion
+
+# region Test
+
 if __name__ == '__main__':
 
     mock_navigate = True
@@ -511,3 +541,5 @@ if __name__ == '__main__':
         
     # In the end, kill everything
     close_app(belt_controller)
+
+# endregion

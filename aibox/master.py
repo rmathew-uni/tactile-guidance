@@ -29,19 +29,6 @@ import threading
 
 # endregion
 
-# region Helpers
-
-def playstart():
-    file = 'resources/sound/beginning.mp3' # ROOT
-    playsound(str(file))
-
-
-def play_start():
-    play_start_thread = threading.Thread(target=playstart, name='play_start')
-    play_start_thread.start()
-
-# endregion
-
 # region Main
 
 if __name__ == '__main__':
