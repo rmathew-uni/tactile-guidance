@@ -182,6 +182,7 @@ def navigate_hand(
     w,h = 1920, 1080
 
     if belt_controller:
+        vibration_intensity = 100
         termination_signal = start_listener()
 
     if termination_signal:
@@ -216,9 +217,10 @@ def navigate_hand(
         target_upper_bound = target[1] - target_height//2
 
     # Use depth information for guidance via vibration intensity modulation
-    distance = np.abs(target[7] - hand[7])
-    vibration_intensity = min(10000 / distance, 100) # d=10 -> 100, d=1000 -> 10
-    print(f'Distance: {distance}. Intensity: {vibration_intensity}.')
+    if target is not None and hand is not None:
+        distance = np.abs(target[7] - hand[7])
+        vibration_intensity = min(int(10000/distance), 100) # d=10 -> 100, d=1000 -> 10
+        print(f'Distance: {distance}. Intensity: {vibration_intensity}.')
  
 
     # 1. Grasping: Hand is detected and horizontally and vertically aligned with target --> send grasp (target might be occluded in frame)
