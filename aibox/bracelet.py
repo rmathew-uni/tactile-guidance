@@ -120,18 +120,33 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
     # If there is an anything between hand and target that can be hit (depth smaller than depth of both target and image) - move backwards
 
-    depth_intensity = round(-max_intensity/5) * 5
+    roi_x_min, roi_x_max, roi_y_min, roi_y_max = int(min(xc_target, xc_hand)), int(max(xc_target, xc_hand)), int(min(yc_target, yc_hand)), int(max(yc_target, yc_hand))
+
+    roi = depth_img[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
+    try:
+        max_depth = np.max(roi)
+    except ValueError:
+        max_depth = -1
+
+    print(handBB[7])
+    print(targetBB[7])
+    print(max_depth)
+
+    if max_depth > handBB[7]:
+        print("object in line of movement")
+        depth_intensity = round(-max_intensity/5) * 5
 
     # Otherwise check if hand is closer or further than the target and set depth intensity accordingly
-    depth_distance = handBB[7] - targetBB[7]
-    if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
-        if depth_distance > 0: #move forward
-            depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
-        elif depth_distance < 0: #move backwards
-            depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
-        depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
     else:
-        depth_intensity = 0 # placeholder
+        depth_distance = handBB[7] - targetBB[7]
+        if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
+            if depth_distance > 0: #move forward
+                depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
+            elif depth_distance < 0: #move backwards
+                depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
+            depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
+        else:
+            depth_intensity = 0 # placeholder
     
     return int(right_intensity), int(left_intensity), int(top_intensity), int(bottom_intensity), depth_intensity
 
