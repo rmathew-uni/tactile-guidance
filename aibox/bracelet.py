@@ -89,7 +89,7 @@ def calibrate_intensity():
     return 50
 
 
-def get_intensity(handBB, targetBB, max_intensity):
+def get_intensity(handBB, targetBB, max_intensity, depth_img):
 
     # calculate angle
     xc_hand, yc_hand = handBB[:2]
@@ -118,7 +118,11 @@ def get_intensity(handBB, targetBB, max_intensity):
         right_intensity = (angle - 270) / 90 * max_intensity
 
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
-    #depth_distance = np.abs(targetBB[7] - handBB[7])
+    # If there is an anything between hand and target that can be hit (depth smaller than depth of both target and image) - move backwards
+
+    depth_intensity = round(-max_intensity/5) * 5
+
+    # Otherwise check if hand is closer or further than the target and set depth intensity accordingly
     depth_distance = handBB[7] - targetBB[7]
     if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
         if depth_distance > 0: #move forward
@@ -197,7 +201,8 @@ def navigate_hand(
         belt_controller, 
         bboxes,
         target_cls: str, 
-        hand_clss: list):
+        hand_clss: list,
+        depth_img):
     """ Function that navigates the hand to the target object. Handles cases when either hand or target is not detected.
 
     Args:
@@ -241,7 +246,7 @@ def navigate_hand(
  
     if hand is not None and target is not None:
         # Get varying vibration intensities depending on angle from hand to target
-        right_int, left_int, top_int, bot_int, depth_int = get_intensity(hand, target, max_intensity)
+        right_int, left_int, top_int, bot_int, depth_int = get_intensity(hand, target, max_intensity, depth_img)
         print(f'Vibration intensitites. Right: {right_int}, Left: {left_int}, Top: {top_int}, Bottom: {bot_int}.')
         # Check whether the hand is overlapping the target and freeze targetBB size if necessary (to avoid BB shrinking on occlusion)
         overlapping, freezed_tbbw, freezed_tbbh, freezed = check_overlap(hand, target, freezed_tbbw, freezed_tbbh, freezed)

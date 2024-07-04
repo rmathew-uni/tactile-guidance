@@ -419,7 +419,7 @@ class BraceletController(AutoAssign):
                 self.target_entered = True
 
             # Navigate the hand based on information from last frame and current frame detections
-            grasped = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav)
+            grasped = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav, depth_img)
         
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasped:
