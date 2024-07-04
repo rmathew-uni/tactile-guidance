@@ -419,21 +419,7 @@ class BraceletController(AutoAssign):
                 self.target_entered = True
 
             # Navigate the hand based on information from last frame and current frame detections
-            if frame == 0: # Initialize navigation
-                prev_hand, prev_target, freezed_tbbw, freezed_tbbh, freezed, timer, grasped = \
-                    navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav)
-
-            prev_hand, prev_target, freezed_tbbw, freezed_tbbh, freezed, timer, grasped = \
-                navigate_hand(self.belt_controller,
-                              outputs,
-                              class_target_obj,
-                              self.class_hand_nav,
-                              prev_hand, 
-                              prev_target, 
-                              freezed_tbbw, 
-                              freezed_tbbh,
-                              freezed,
-                              timer)
+            grasped = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav)
         
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasped:
@@ -501,7 +487,7 @@ class BraceletController(AutoAssign):
 
         # Load tracker model
         if self.run_object_tracker:
-            self.load_object_tracker(max_age=30, n_init=2) # the max_age of a track should depend on the average fps of the program (i.e. should be measured in time, not frames)
+            self.load_object_tracker(max_age=10, n_init=10) # the max_age of a track should depend on the average fps of the program (i.e. should be measured in time, not frames)
         else:
             print('SKIPPING OBJECT TRACKER INITIALIZATION')
 

@@ -4,7 +4,7 @@ import time
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
                                     BeltOrientationType,
-                                    BeltVibrationTimerOption)
+                                    BeltVibrationTimerOption, BeltVibrationPattern)
 from auto_connect import interactive_belt_connect, setup_logger
 import threading
 import sys
@@ -86,7 +86,7 @@ def choose_detection(bboxes, previous_bbox=None, w=1920, h=1080):
 
 def calibrate_intensity():
     # to be implemented
-    return 100
+    return 50
 
 
 def get_intensity(handBB, targetBB, max_intensity):
@@ -119,13 +119,13 @@ def get_intensity(handBB, targetBB, max_intensity):
 
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
     depth_distance = np.abs(targetBB[7] - handBB[7])
-    if isinstance(depth_distance, (int, float, np.integer, np.floating)):
+    if isinstance(depth_distance, (int, float, np.integer, np.floating)) and depth_distance is not np.nan:
         depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
         depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
     else:
         depth_intensity = 0 # placeholder
     
-    return right_intensity, left_intensity, top_intensity, bottom_intensity, depth_intensity
+    return int(right_intensity), int(left_intensity), int(top_intensity), int(bottom_intensity), depth_intensity
 
 
 def check_overlap(handBB, targetBB, freezed_width, freezed_height, freezed=False):
@@ -179,19 +179,21 @@ def check_overlap(handBB, targetBB, freezed_width, freezed_height, freezed=False
         return False, tbbw, tbbh, freezed
 
 
+# GLOBALS
 max_intensity = calibrate_intensity()
+searching = False
+prev_hand = None
+prev_target = None 
+freezed_tbbw = -1
+freezed_tbbh = -1
+freezed = False
+timer = 0
 
 def navigate_hand(
         belt_controller, 
         bboxes,
         target_cls: str, 
-        hand_clss: list,
-        prev_hand: object = None, 
-        prev_target: object = None, 
-        freezed_tbbw: int = -1, 
-        freezed_tbbh: int = -1,
-        freezed: bool = False,
-        timer: int = 0):
+        hand_clss: list):
     """ Function that navigates the hand to the target object. Handles cases when either hand or target is not detected.
 
     Args:
@@ -213,16 +215,25 @@ def navigate_hand(
     """
 
     global max_intensity
+    global searching
+    global prev_hand
+    global prev_target
+    global freezed_tbbw
+    global freezed_tbbh
+    global freezed
+    global timer
     overlapping = False
 
     # Search for object and hand with the highest prediction confidence
     ## Filter for hand detections
     bboxes_hands = [detection for detection in bboxes if detection[5] in hand_clss]
     hand = choose_detection(bboxes_hands, prev_hand)
+    prev_hand = hand
 
     ## Filter for target detections
     bboxes_objects = [detection for detection in bboxes if detection[5] == target_cls]
     target = choose_detection(bboxes_objects, prev_target)
+    prev_target = target
  
     if hand is not None and target is not None:
         # Get varying vibration intensities depending on angle from hand to target
@@ -233,6 +244,7 @@ def navigate_hand(
 
     # 1. Grasping
     if overlapping:
+        searching = True
         if belt_controller:
             belt_controller.stop_vibration()
             belt_controller.send_pulse_command(
@@ -250,46 +262,103 @@ def navigate_hand(
                             clear_other_channels=False
                             )
         print("G R A S P !")
-        return hand, target, freezed_tbbw, freezed_tbbh, freezed, timer, overlapping
+        return overlapping
 
 
     # 2. Guidance
     if hand is not None and target is not None:
+        searching = True
         if belt_controller:
+            """
             # All motors vibrate with varying intensity
             belt_controller.vibrate_at_angle(120, intensity=right_int)
             belt_controller.vibrate_at_angle(45, intensity=left_int)
             belt_controller.vibrate_at_angle(90, intensity=top_int)
             belt_controller.vibrate_at_angle(60, intensity=bot_int)
             #belt_controller.vibrate_at_angle(0, intensity=depth_int)
-        return hand, target, freezed_tbbw, freezed_tbbh, freezed, timer, overlapping
+            """
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=right_int,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=120,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
+            belt_controller.send_vibration_command(
+            channel_index=1,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=left_int,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=45,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
+            belt_controller.send_vibration_command(
+            channel_index=2,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=top_int,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=90,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
+            belt_controller.send_vibration_command(
+            channel_index=3,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=bot_int,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=60,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
+        return overlapping
 
 
     # 3. Target is located and hand can be moved into the frame
     if target is not None:
         timer += 1
-        if timer >= 15:
-            if belt_controller:
-                belt_controller.stop_vibration()
-                belt_controller.send_pulse_command(
-                            channel_index=0,
-                            orientation_type=BeltOrientationType.ANGLE,
-                            orientation=120, # bottom motor
-                            intensity=max_intensity,
-                            on_duration_ms=100,
-                            pulse_period=500,
-                            pulse_iterations=3,
-                            series_period=5000,
-                            series_iterations=1,
-                            timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                            exclusive_channel=False,
-                            clear_other_channels=False
-                        )
-        print('Target found.')
-        return hand, target, freezed_tbbw, freezed_tbbh, freezed, timer, overlapping
+        if belt_controller and searching:
+            searching = False
+            belt_controller.stop_vibration()
+            belt_controller.send_pulse_command(
+                        channel_index=0,
+                        orientation_type=BeltOrientationType.ANGLE,
+                        orientation=60, # bottom motor
+                        intensity=max_intensity//6,
+                        on_duration_ms=150,
+                        pulse_period=500,
+                        pulse_iterations=5,
+                        series_period=5000,
+                        series_iterations=1,
+                        timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                        exclusive_channel=False,
+                        clear_other_channels=False
+                    )
+        # reset searching flag to send command again
+        if timer >= 50:
+            searching = True
+            timer = 0
+        print('Target found.', searching, timer)
+        return overlapping
     
 
     # 4. Target is not in the frame yet.
     else:
+        timer = 0
+        searching = True
         print('Target not found yet.')
-        return hand, target, freezed_tbbw, freezed_tbbh, freezed, timer, overlapping
+        return overlapping
