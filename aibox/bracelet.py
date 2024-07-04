@@ -118,9 +118,13 @@ def get_intensity(handBB, targetBB, max_intensity):
         right_intensity = (angle - 270) / 90 * max_intensity
 
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
-    depth_distance = np.abs(targetBB[7] - handBB[7])
-    if isinstance(depth_distance, (int, float, np.integer, np.floating)) and depth_distance is not np.nan:
-        depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
+    #depth_distance = np.abs(targetBB[7] - handBB[7])
+    depth_distance = handBB[7] - targetBB[7]
+    if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
+        if depth_distance > 0: #move forward
+            depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
+        elif depth_distance < 0: #move backwards
+            depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
         depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
     else:
         depth_intensity = 0 # placeholder
@@ -251,7 +255,7 @@ def navigate_hand(
                             channel_index=1,
                             orientation_type=BeltOrientationType.BINARY_MASK,
                             orientation=0b111100,
-                            intensity=depth_int,
+                            intensity=abs(depth_int),
                             on_duration_ms=150,
                             pulse_period=500,
                             pulse_iterations=5,
@@ -268,6 +272,13 @@ def navigate_hand(
     # 2. Guidance
     if hand is not None and target is not None:
         searching = True
+
+        print("depth intensity: " + str(depth_int))
+        if depth_int > 0:
+            print("move forward")
+        elif depth_int < 0:
+            print("move backwards")
+
         if belt_controller:
             """
             # All motors vibrate with varying intensity
