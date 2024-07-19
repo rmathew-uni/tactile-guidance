@@ -1,116 +1,196 @@
-import os
-import cv2
 import numpy as np
+import time
+import sys
+from pybelt.belt_controller import (BeltConnectionState, BeltController,
+                                    BeltControllerDelegate, BeltMode,
+                                    BeltOrientationType,
+                                    BeltVibrationTimerOption)
 
-def get_direction(start_point, end_point):
-    """
-    Determine the direction from start_point to end_point.
-    """
-    dx = end_point[0] - start_point[0]
-    dy = end_point[1] - start_point[1]
+class Delegate(BeltControllerDelegate):
+    # Belt controller delegate
+    pass
+belt_controller_delegate = Delegate()
+belt_controller = BeltController(belt_controller_delegate)
+vibration_intensity = 100
+                                    
+# Define shapes with vertices
+shapes = {
+    'arrow': [(0, 0), (4, 0), (4, 1), (7, -1), (4, -3), (4, -2), (0, -2)],
+    'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
+    'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
+    'kite': [(0, 0), (3, 2), (6, 0), (3, -6)],
+    'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4)],
+    'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
+    'pentagon': [(0, 0), (3, 2), (6, 0), (5, -3), (1, -3)],
+    'rhombus': [(0, 0), (2, 2), (4, 2), (2, 0)],
+    'star': [(0, 0), (2, 0), (3, 2), (4, 0), (6, 0), (4, -1), (5, -3), (3, -2), (1, -3), (2, -1)],
+    'trapezoid': [(0, 0), (2, 2), (6, 2), (8, 0)],
+    'square': [(0, 0), (0, 2), (2, 2), (2, 0)],
+    'rectangle': [(0, 0), (0, 2), (4, 2), (4, 0)],
+    'triangle': [(0, 0), (3, 3), (3, 0)],
+    'diamond' :[(0,0), (2,2), (6,2), (8,0), (4,-6)],
+    'one' : [(0,0), (0,-4)],
+    'two' : [(0,0), (2,0), (2,-2), (0,-2), (0,-4), (2,-4)],
+    'three' : [(0,0), (2,0), (2,-2), (0,-2), (2,-2), (2,-4), (0,-4)],
+    'four' : [(0,0), (0,-2), (2,-2), (2,0), (2,-4)],
+    'five' : [(0,0), (-2,0), (-2,-2), (0,-2), (0,-4), (-2,-4)],
+    'six' : [(0,0), (-2,0), (-2,-4), (0,-4), (0,-2), (-2,-2)],
+    'seven' : [(0,0), (2,0), (2,-4)],
+    'eight' : [(0,0), (-2,0), (-2,-2), (0,-2), (0,-4), (-2,-4), (-2,-2), (0,-2), (0,0)],
+    'nine' : [(0,0), (-2,0), (-2,-2), (0,-2), (0,0), (0,-4), (-2,-4)],
+}
 
+# Function to calculate direction and distance
+def calculate_direction_and_time(start, end, speed=1):
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    distance = np.sqrt(dx**2 + dy**2)
+    time_required = distance / speed 
+    
     if dx > 0 and dy == 0:
-        return 'right'
+        if belt_controller:
+            belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+            return 'right', time_required
     elif dx < 0 and dy == 0:
-        return 'left'
-    elif dx == 0 and dy > 0:
-        return 'down'
-    elif dx == 0 and dy < 0:
-        return 'up'
-    elif dx > 0 and dy < 0:
-        return 'diagonal right top'
-    elif dx < 0 and dy < 0:
-        return 'diagonal left top'
+        if belt_controller:
+            belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+            return 'left', time_required
+    elif dy > 0 and dx == 0:
+        if belt_controller:
+            belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)        
+            return 'top', time_required
+    elif dy < 0 and dx == 0:
+        if belt_controller:
+            belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+            return 'down', time_required
     elif dx > 0 and dy > 0:
-        return 'diagonal right bottom'
+        if belt_controller:
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=vibration_intensity,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5,
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+            return 'diagonal right top', time_required
+    elif dx > 0 and dy < 0:
+        if belt_controller:
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=vibration_intensity,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5,
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+            return 'diagonal right bottom', time_required
     elif dx < 0 and dy > 0:
-        return 'diagonal left bottom'
+        if belt_controller:
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=vibration_intensity,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5,
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+            return 'diagonal left top', time_required
+    elif dx < 0 and dy < 0:
+        if belt_controller:
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=vibration_intensity,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5,
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+            return 'diagonal left bottom', time_required
+    else:
+        return 'none', 0
+    
+# Function to detect outline and simulate tactile feedback
+def simulate_tactile_feedback(shape, speed=1):
+    vertices = shapes[shape]
+    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']:
+        vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
+    else:
+        vertices.append(vertices[0])  # Close the shape by returning to the starting point
+    
+    for i in range(len(vertices) - 1):
+        start = vertices[i]
+        end = vertices[i + 1]
+        direction, time_required = calculate_direction_and_time(start, end, speed)
+        if direction != 'none':
+            print(f"Move {direction} for {time_required:.2f} seconds")
+            time.sleep(time_required)  # Simulate the time required for the movement
 
-def detect_shapes_and_generate_tactile_commands(image_path):
-    """
-    Function to detect shapes and generate tactile feedback commands for the entire contour.
+# List of shapes to loop through
+shapes_to_detect_1 = ['parallelogram', 'square', 'nine',	'hexagon',	'pentagon',	
+                    'arrow',	'cross',	'rhombus',	'triangle','one',	'star',	
+                    'three',	'two',	'rectangle',	'five',	'seven',	'kite',	
+                    'four',	'octagon',	'trapezoid',	'six',	'diamond', 'eight']
 
-    Parameters:
-    - image_path (str): Path to the input image file.
+shapes_to_detect_2 = ['rhombus',	'seven',	'kite',	'two',	'octagon',	'star',	
+                    'triangle', 'one',	 'diamond', 'eight',	'three',	'six',	'arrow',	
+                    'four',	'hexagon',	'pentagon',	'five',	'nine',	'square',	'cross',
+                    'parallelogram',	'trapezoid',	'rectangle']
 
-    Returns:
-    - list: List of tuples (commands) for each detected shape.
-    """
+shapes_to_detect_3 = ['five',	'hexagon', 'kite', 'octagon', 'square',	'cross',	
+                    'nine',	'parallelogram',	'trapezoid', 'six',	'pentagon',	
+                    'two',	'seven',	'rectangle',	'triangle', 'one',	 'diamond', 
+                    'four',	'star',	'eight',	'arrow',	'rhombus',	'three']
 
-    # Load image
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"Error: Unable to load image from {image_path}")
-        return []
+# Loop through the shapes
+for index, shape in enumerate(shapes_to_detect_1):
+    print(shape)
+    simulate_tactile_feedback(shape)
+    print("stop \n")  # Adding a newline for better readability between shapes
+    if belt_controller:
+        belt_controller.stop_vibration()
+        belt_controller.send_pulse_command(
+            channel_index=0,
+            orientation_type=BeltOrientationType.BINARY_MASK,
+            orientation=0b111100,
+            intensity=vibration_intensity,
+            on_duration_ms=150,
+            pulse_period=500,
+            pulse_iterations=5, 
+            series_period=5000,
+            series_iterations=1,
+            timer_option=BeltVibrationTimerOption.RESET_TIMER,
+            exclusive_channel=False,
+            clear_other_channels=False)
+    time.sleep(2)  # Pause for 2 seconds after each shape
+    
+    # Add a 5-second rest after every 5 shapes
+    if (index + 1) % 5 == 0:
+        print("5-second rest \n")
+        time.sleep(5)
 
-    # Convert image to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Apply Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+# Example usage
+# shape_to_detect = 'nine'  # Change to 'rectangle', 'triangle', 'polygon' as needed
+# simulate_tactile_feedback(shape_to_detect)
 
-    # Threshold the image to obtain binary image
-    _, thresh = cv2.threshold(blurred, 60, 255, cv2.THRESH_BINARY_INV)
-
-    # Find contours in the binary image
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    tactile_commands = []
-
-    # Process each contour
-    for cnt in contours:
-        # Approximate the contour to a polygon
-        epsilon = 0.02 * cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, epsilon, True)
-
-        # Generate direction commands for the contour
-        commands = []
-        for i in range(len(approx)):
-            start_point = approx[i][0]
-            end_point = approx[(i + 1) % len(approx)][0]
-            command = get_direction(start_point, end_point)
-            commands.append(command)
-
-            # Add a 'stop' command when the last line meets the first line
-            if (i + 1) % len(approx) == 0:
-                commands.append('stop')
-
-        tactile_commands.append(commands)
-
-        # Print tactile commands
-        print(f"Tactile Feedback Commands: {commands}")
-
-    return tactile_commands
-
-def process_specified_images(folder_path, image_files):
-    """
-    Function to process specified images from a folder.
-
-    Parameters:
-    - folder_path (str): Path to the folder containing images.
-    - image_files (list): List of image file names to process.
-    """
-    # List all files in the folder to ensure they are correct
-    print("Listing all files in the folder:")
-    all_files = os.listdir(folder_path)
-    print(all_files)
-
-    # Process each specified image
-    for image_file in image_files:
-        image_path = os.path.join(folder_path, image_file)
-        if not os.path.exists(image_path):
-            print(f"File does not exist: {image_path}")
-            continue
-
-        print(f"\nProcessing Image: {image_path}")
-        shape_commands = detect_shapes_and_generate_tactile_commands(image_path)
-        
-        # Print tactile feedback commands for each detected shape
-        for commands in shape_commands:
-            print(f"Tactile Feedback Commands: {commands}")
-
-# Example usage:
-folder_path = 'C:/Users/Felicia/Bracelet/tactile-guidance-main/Shape detection/Images/'
-image_files = ['pentagon.jpg']  # Specify the image file(s) to process
-
-process_specified_images(folder_path, image_files)
