@@ -1,16 +1,21 @@
 import numpy as np
 import time
 import sys
+from auto_connect import interactive_belt_connect, setup_logger
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
                                     BeltOrientationType,
-                                    BeltVibrationTimerOption)
+                                    BeltVibrationTimerOption, BeltVibrationPattern)
 
-class Delegate(BeltControllerDelegate):
-    # Belt controller delegate
-    pass
-belt_controller_delegate = Delegate()
-belt_controller = BeltController(belt_controller_delegate)
+from bracelet import navigate_hand, connect_belt
+
+connection_check, belt_controller = connect_belt()
+if connection_check:
+    print('Bracelet connection successful.')
+else:
+    print('Error connecting bracelet. Aborting.')
+    sys.exit()
+
 vibration_intensity = 100
                                     
 # Define shapes with vertices
@@ -38,6 +43,18 @@ shapes = {
     'seven' : [(0,0), (2,0), (2,-4)],
     'eight' : [(0,0), (-2,0), (-2,-2), (0,-2), (0,-4), (-2,-4), (-2,-2), (0,-2), (0,0)],
     'nine' : [(0,0), (-2,0), (-2,-2), (0,-2), (0,0), (0,-4), (-2,-4)],
+    'c' : [(0,0), (-2,0), (-2,-4), (0,-4)],
+    'e' : [(0,0), (-2,0), (-2,-2), (0,-2), (-2,-2), (-2,-4), (0,-4)],
+    'j' : [(0,0), (2,0), (2,-4), (0,-4), (0,-2)],
+    'l' : [(0,0), (0,-4), (2,-4)],
+    'm' : [(0,0), (0,4), (1,4), (1,0), (1,4), (2,4), (2,0)],
+    'n' : [(0,0), (0,4), (2,4), (2,0)],
+    'p' : [(0,0), (0,4), (2,4), (2,2), (0,2)],
+    'u' : [(0,0), (0,-4), (2,-4), (2,0)],
+    'r' : [(0,0), (0,4), (2,4), (2,2), (0,2), (2,0)],
+    'v' : [(0,0), (2,-4), (4,0)],
+    'w' : [(0,0), (0,-4), (2,-2), (4,-4), (4,0)],
+    'z' : [(0,0), (2,0), (0,-4), (2,-4)],
 }
 
 # Function to calculate direction and distance
@@ -46,86 +63,128 @@ def calculate_direction_and_time(start, end, speed=1):
     dy = end[1] - start[1]
     distance = np.sqrt(dx**2 + dy**2)
     time_required = distance / speed 
+
+    intensity = 50
     
     if dx > 0 and dy == 0:
         if belt_controller:
-            belt_controller.vibrate_at_angle(120, channel_index=0, intensity=vibration_intensity)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=120,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'right', time_required
     elif dx < 0 and dy == 0:
         if belt_controller:
-            belt_controller.vibrate_at_angle(45, channel_index=0, intensity=vibration_intensity)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=45,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'left', time_required
     elif dy > 0 and dx == 0:
         if belt_controller:
-            belt_controller.vibrate_at_angle(90, channel_index=0, intensity=vibration_intensity)        
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=90,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )     
             return 'top', time_required
     elif dy < 0 and dx == 0:
         if belt_controller:
-            belt_controller.vibrate_at_angle(60, channel_index=0, intensity=vibration_intensity)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.ANGLE,
+            orientation=60,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'down', time_required
     elif dx > 0 and dy > 0:
         if belt_controller:
-            belt_controller.send_pulse_command(
-                channel_index=0,
-                orientation_type=BeltOrientationType.BINARY_MASK,
-                orientation=0b111100,
-                intensity=vibration_intensity,
-                on_duration_ms=150,
-                pulse_period=500,
-                pulse_iterations=5,
-                series_period=5000,
-                series_iterations=1,
-                timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                exclusive_channel=False,
-                clear_other_channels=False)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.BINARY_MASK,
+            orientation=0b110000,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'diagonal right top', time_required
     elif dx > 0 and dy < 0:
         if belt_controller:
-            belt_controller.send_pulse_command(
-                channel_index=0,
-                orientation_type=BeltOrientationType.BINARY_MASK,
-                orientation=0b111100,
-                intensity=vibration_intensity,
-                on_duration_ms=150,
-                pulse_period=500,
-                pulse_iterations=5,
-                series_period=5000,
-                series_iterations=1,
-                timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                exclusive_channel=False,
-                clear_other_channels=False)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.BINARY_MASK,
+            orientation=0b101000,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'diagonal right bottom', time_required
     elif dx < 0 and dy > 0:
         if belt_controller:
-            belt_controller.send_pulse_command(
-                channel_index=0,
-                orientation_type=BeltOrientationType.BINARY_MASK,
-                orientation=0b111100,
-                intensity=vibration_intensity,
-                on_duration_ms=150,
-                pulse_period=500,
-                pulse_iterations=5,
-                series_period=5000,
-                series_iterations=1,
-                timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                exclusive_channel=False,
-                clear_other_channels=False)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.BINARY_MASK,
+            orientation=0b010100,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'diagonal left top', time_required
     elif dx < 0 and dy < 0:
         if belt_controller:
-            belt_controller.send_pulse_command(
-                channel_index=0,
-                orientation_type=BeltOrientationType.BINARY_MASK,
-                orientation=0b111100,
-                intensity=vibration_intensity,
-                on_duration_ms=150,
-                pulse_period=500,
-                pulse_iterations=5,
-                series_period=5000,
-                series_iterations=1,
-                timer_option=BeltVibrationTimerOption.RESET_TIMER,
-                exclusive_channel=False,
-                clear_other_channels=False)
+            belt_controller.send_vibration_command(
+            channel_index=0,
+            pattern=BeltVibrationPattern.CONTINUOUS,
+            intensity=intensity,
+            orientation_type=BeltOrientationType.BINARY_MASK,
+            orientation=0b001100,
+            pattern_iterations=None,
+            pattern_period=500,
+            pattern_start_time=0,
+            exclusive_channel=False,
+            clear_other_channels=False
+            )
             return 'diagonal left bottom', time_required
     else:
         return 'none', 0
@@ -147,25 +206,25 @@ def simulate_tactile_feedback(shape, speed=1):
             time.sleep(time_required)  # Simulate the time required for the movement
 
 # List of shapes to loop through
-shapes_to_detect_1 = ['parallelogram', 'square', 'nine',	'hexagon',	'pentagon',	
-                    'arrow',	'cross',	'rhombus',	'triangle','one',	'star',	
-                    'three',	'two',	'rectangle',	'five',	'seven',	'kite',	
-                    'four',	'octagon',	'trapezoid',	'six',	'diamond', 'eight']
+shapes_to_detect_1 = ['square', 'octagon', 'cross', 'seven', 'diamond', 'one', 'triangle', 
+                      'two', 'w', 'kite', 'rectangle', 'nine', 'c', 'j', 'four', 'star', 'n', 
+                      'pentagon', 'p', 'z', 'hexagon', 'u', 'l', 'three', 'v', 'six', 'e', 
+                      'rhombus', 'm', 'eight', 'five', 'parallelogram', 'r', 'arrow', 'trapezoid']
 
-shapes_to_detect_2 = ['rhombus',	'seven',	'kite',	'two',	'octagon',	'star',	
-                    'triangle', 'one',	 'diamond', 'eight',	'three',	'six',	'arrow',	
-                    'four',	'hexagon',	'pentagon',	'five',	'nine',	'square',	'cross',
-                    'parallelogram',	'trapezoid',	'rectangle']
+shapes_to_detect_2 = ['parallelogram', 'e', 'arrow', 'r', 'six', 'p', 'one', 'seven', 'square', 
+                      'u', 'n', 'pentagon', 'diamond', 'j', 'three', 'v', 'triangle', 'star', 'm', 
+                      'five', 'rectangle', 'four', 'hexagon', 'kite', 'nine', 'octagon', 'eight', 
+                      'w', 'trapezoid', 'cross', 'z', 'rhombus', 'c', 'l', 'two']
 
-shapes_to_detect_3 = ['five',	'hexagon', 'kite', 'octagon', 'square',	'cross',	
-                    'nine',	'parallelogram',	'trapezoid', 'six',	'pentagon',	
-                    'two',	'seven',	'rectangle',	'triangle', 'one',	 'diamond', 
-                    'four',	'star',	'eight',	'arrow',	'rhombus',	'three']
+shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine', 'eight', 'm', 
+                      'seven', 'kite', 'rectangle', 'c', 'three', 'u', 'rhombus', 'five', 'star', 
+                      'six', 'e', 'diamond', 'square', 'j', 'parallelogram', 'trapezoid', 'pentagon', 
+                      'w', 'octagon', 'p', 'z', 'four', 'one', 'v', 'triangle']
 
 # Loop through the shapes
 for index, shape in enumerate(shapes_to_detect_1):
     print(shape)
-    simulate_tactile_feedback(shape)
+    simulate_tactile_feedback(shape, speed=1.0)
     print("stop \n")  # Adding a newline for better readability between shapes
     if belt_controller:
         belt_controller.stop_vibration()
@@ -193,4 +252,3 @@ for index, shape in enumerate(shapes_to_detect_1):
 # Example usage
 # shape_to_detect = 'nine'  # Change to 'rectangle', 'triangle', 'polygon' as needed
 # simulate_tactile_feedback(shape_to_detect)
-
