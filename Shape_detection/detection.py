@@ -224,7 +224,7 @@ shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine',
 # Loop through the shapes
 for index, shape in enumerate(shapes_to_detect_1):
     print(shape)
-    simulate_tactile_feedback(shape, speed=1.0)
+    simulate_tactile_feedback(shape)
     print("stop \n")  # Adding a newline for better readability between shapes
     if belt_controller:
         belt_controller.stop_vibration()
