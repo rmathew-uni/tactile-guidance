@@ -15,15 +15,13 @@ if connection_check:
 else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
-
-vibration_intensity = 100
                                     
 # Define shapes with vertices
 shapes = {
-    'arrow': [(0, 0), (4, 0), (4, 1), (7, -1), (4, -3), (4, -2), (0, -2)],
+    'arrow': [(0, 0), (3, 0), (3, 1), (5, -1), (3, -3), (3, -2), (0, -2)],
     'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
     'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
-    'kite': [(0, 0), (3, 2), (6, 0), (3, -6)],
+    'kite': [(0, 0), (2, 2), (4, 0), (2, -5)],
     'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4)],
     'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
     'pentagon': [(0, 0), (3, 2), (6, 0), (5, -3), (1, -3)],
@@ -192,7 +190,8 @@ def calculate_direction_and_time(start, end, speed=1):
 # Function to detect outline and simulate tactile feedback
 def simulate_tactile_feedback(shape, speed=1):
     vertices = shapes[shape]
-    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']:
+    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
+                 'c', 'e', 'j', 'l', 'm', 'n', 'p', 'u', 'r', 'v', 'w', 'z']:
         vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
     else:
         vertices.append(vertices[0])  # Close the shape by returning to the starting point
@@ -232,7 +231,7 @@ for index, shape in enumerate(shapes_to_detect_1):
             channel_index=0,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b111100,
-            intensity=vibration_intensity,
+            intensity= intensity,
             on_duration_ms=150,
             pulse_period=500,
             pulse_iterations=5, 
@@ -241,7 +240,7 @@ for index, shape in enumerate(shapes_to_detect_1):
             timer_option=BeltVibrationTimerOption.RESET_TIMER,
             exclusive_channel=False,
             clear_other_channels=False)
-    time.sleep(2)  # Pause for 2 seconds after each shape
+    time.sleep(3)  # Pause for 2 seconds after each shape
     
     # Add a 5-second rest after every 5 shapes
     if (index + 1) % 5 == 0:
