@@ -8,16 +8,16 @@ shapes = {
     'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
     'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
     'kite': [(0, 0), (2, 2), (4, 0), (2, -5)],
-    'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4)],
+    'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4), (0,-2)],
     'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
-    'pentagon': [(0, 0), (3, 2), (6, 0), (5, -3), (1, -3)],
+    'pentagon': [(0, 0), (2, 2), (4, 0), (3, -2), (1, -2)],
     'rhombus': [(0, 0), (2, 2), (4, 2), (2, 0)],
     'star': [(0, 0), (2, 0), (3, 2), (4, 0), (6, 0), (4, -1), (5, -3), (3, -2), (1, -3), (2, -1)],
-    'trapezoid': [(0, 0), (2, 2), (6, 2), (8, 0)],
+    'trapezoid': [(0, 0), (1, 2), (4, 2), (5, 0)],
     'square': [(0, 0), (0, 2), (2, 2), (2, 0)],
     'rectangle': [(0, 0), (0, 2), (4, 2), (4, 0)],
     'triangle': [(0, 0), (3, 3), (3, 0)],
-    'diamond' :[(0,0), (2,2), (6,2), (8,0), (4,-6)],
+    'diamond' :[(0,0), (1,2), (3,2), (4,0), (2,-4)],
     'one' : [(0,0), (0,-4)],
     'two' : [(0,0), (2,0), (2,-2), (0,-2), (0,-4), (2,-4)],
     'three' : [(0,0), (2,0), (2,-2), (0,-2), (2,-2), (2,-4), (0,-4)],
@@ -107,7 +107,7 @@ for index, shape in enumerate(shapes_to_detect_1):
     print(shape)
     simulate_tactile_feedback(shape)
     print("stop \n")  # Adding a newline for better readability between shapes
-    time.sleep(3)  # Pause for 2 seconds after each shape
+    time.sleep(3)  # Pause for 3 seconds after each shape
     
     # Add a 5-second rest after every 5 shapes
     if (index + 1) % 5 == 0:
