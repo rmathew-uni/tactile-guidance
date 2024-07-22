@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import time
 
 # Define shapes with vertices
 shapes = {
@@ -72,7 +71,6 @@ def visualize_shapes(shapes, speed=1.5):
         
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
-        time.sleep(3)  # Pause for 3 seconds between shapes
 
 # Visualize all shapes
 visualize_shapes(shapes, speed=1.5)
