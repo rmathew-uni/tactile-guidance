@@ -52,7 +52,7 @@ shapes = {
     'r' : [(0,0), (0,4), (2,4), (2,2), (0,2), (2,0)],
     'v' : [(0,0), (2,-4), (4,0)],
     'w' : [(0,0), (0,-4), (2,-2), (4,-4), (4,0)],
-    'z' : [(0,0), (2,0), (0,-4), (2,-4)],
+    'z' : [(0,0), (2,0), (0,-4), (2,-4)]
 }
 
 # Function to calculate direction and distance
@@ -62,14 +62,14 @@ def calculate_direction_and_time(start, end, speed=1):
     distance = np.sqrt(dx**2 + dy**2)
     time_required = distance / speed 
 
-    intensity = 50
+    vibration_intensity = 50
     
     if dx > 0 and dy == 0:
         if belt_controller:
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.ANGLE,
             orientation=120,
             pattern_iterations=None,
@@ -84,7 +84,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.ANGLE,
             orientation=45,
             pattern_iterations=None,
@@ -99,7 +99,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.ANGLE,
             orientation=90,
             pattern_iterations=None,
@@ -114,7 +114,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.ANGLE,
             orientation=60,
             pattern_iterations=None,
@@ -129,7 +129,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b110000,
             pattern_iterations=None,
@@ -144,7 +144,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b101000,
             pattern_iterations=None,
@@ -159,7 +159,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b010100,
             pattern_iterations=None,
@@ -174,7 +174,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=intensity,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b001100,
             pattern_iterations=None,
@@ -223,7 +223,7 @@ shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine',
 # Loop through the shapes
 for index, shape in enumerate(shapes_to_detect_1):
     print(shape)
-    simulate_tactile_feedback(shape)
+    simulate_tactile_feedback(shape, speed=1.5)
     print("stop \n")  # Adding a newline for better readability between shapes
     if belt_controller:
         belt_controller.stop_vibration()
@@ -231,7 +231,7 @@ for index, shape in enumerate(shapes_to_detect_1):
             channel_index=0,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b111100,
-            intensity= intensity,
+            intensity=100,
             on_duration_ms=150,
             pulse_period=500,
             pulse_iterations=5, 
@@ -240,7 +240,7 @@ for index, shape in enumerate(shapes_to_detect_1):
             timer_option=BeltVibrationTimerOption.RESET_TIMER,
             exclusive_channel=False,
             clear_other_channels=False)
-    time.sleep(3)  # Pause for 3 seconds after each shape
+    time.sleep(4)  # Pause for 3 seconds after each shape
     
     # Add a 5-second rest after every 5 shapes
     if (index + 1) % 5 == 0:
