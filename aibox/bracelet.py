@@ -132,7 +132,21 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     print(targetBB[7])
     print(max_depth)
 
-    if max_depth > handBB[7]:
+    print(f"{xc_hand},{yc_hand},{xc_target},{yc_target}")
+    print(depth_img.shape, roi.shape)
+    print(depth_img[int(yc_hand), int(xc_hand)])
+
+    """xyxy = xywh2xyxy(np.array(roi))
+    label = "ROI"
+    annotator.box_label(xyxy, label)
+
+    # Display results
+    im0 = annotator.result()
+    cv2.imshow("ROI", im0) # original image only
+    """
+
+    #if max_depth > handBB[7]:
+    if max_depth < handBB[7]:
         print("object in line of movement")
         depth_intensity = round(-max_intensity/5) * 5
 
