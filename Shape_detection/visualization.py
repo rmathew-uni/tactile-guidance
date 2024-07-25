@@ -3,15 +3,15 @@ import numpy as np
 
 # Define shapes with vertices
 shapes = {
-    'arrow': [(0, 0), (3, 0), (3, 1), (5, -1), (3, -3), (3, -2), (0, -2)],
+    'arrow': [(0, 0), (3, 0), (3, 2), (6, -1), (3, -4), (3, -2), (0, -2)],
     'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
     'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
     'kite': [(0, 0), (2, 2), (4, 0), (2, -5)],
     'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4), (0, -2)],
     'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
     'pentagon': [(0, 0), (2, 2), (4, 0), (3, -2), (1, -2)],
-    'rhombus': [(0, 0), (2, 0), (3, 1), (1, 1)],
-    'star': [(0, 0), (2, 0), (3, 2), (4, 0), (6, 0), (4, -1), (5, -3), (3, -2), (1, -3), (2, -1)],
+    'hourglass': [(0, 0), (4, 0), (3, 3), (4, 6), (0, 6), (1, 3)],
+    'star': [(0, 0), (3, 5), (6, 0), (0, 3), (6, 3)],
     'trapezoid': [(0, 0), (1, 2), (4, 2), (5, 0)],
     'square': [(0, 0), (0, 2), (2, 2), (2, 0)],
     'rectangle': [(0, 0), (0, 2), (4, 2), (4, 0)],
@@ -30,7 +30,7 @@ shapes = {
     'e': [(0, 0), (-2, 0), (-2, -2), (0, -2), (-2, -2), (-2, -4), (0, -4)],
     'j': [(0, 0), (2, 0), (2, -4), (0, -4), (0, -2)],
     'l': [(0, 0), (0, -4), (2, -4)],
-    'm': [(0, 0), (0, 2), (1, 2), (1, 0), (1, 2), (2, 2), (2, 0)],
+    'm': [(0, 0), (0, 2), (2, 2), (2, 0), (2, 2), (4, 2), (4, 0)],
     'n': [(0, 0), (0, 2), (2, 2), (2, 0)],
     'p': [(0, 0), (0, 4), (2, 4), (2, 2), (0, 2)],
     'u': [(0, 0), (0, -2), (2, -2), (2, 0)],
@@ -49,7 +49,7 @@ def calculate_direction_and_time(start, end, speed=1):
     return '', time_required  # Simplified for visualization
 
 # Function to visualize shapes
-def visualize_shapes(shapes, speed=1.5):
+def visualize_shapes(shapes, speed=1):
     for shape_name, vertices in shapes.items():
         plt.figure()
         plt.title(f"Shape: {shape_name}")
@@ -73,4 +73,4 @@ def visualize_shapes(shapes, speed=1.5):
         plt.show()
 
 # Visualize all shapes
-visualize_shapes(shapes, speed=1.5)
+visualize_shapes(shapes)

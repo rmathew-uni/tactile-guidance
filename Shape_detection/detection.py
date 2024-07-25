@@ -7,7 +7,7 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption, BeltVibrationPattern)
 
-from bracelet import navigate_hand, connect_belt
+from bracelet import connect_belt
 
 connection_check, belt_controller = connect_belt()
 if connection_check:
@@ -18,15 +18,15 @@ else:
                                     
 # Define shapes with vertices
 shapes = {
-    'arrow': [(0, 0), (3, 0), (3, 1), (5, -1), (3, -3), (3, -2), (0, -2)],
+    'arrow': [(0, 0), (3, 0), (3, 2), (6, -1), (3, -4), (3, -2), (0, -2)],
     'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
     'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
     'kite': [(0, 0), (2, 2), (4, 0), (2, -5)],
     'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4), (0, -2)],
     'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
     'pentagon': [(0, 0), (2, 2), (4, 0), (3, -2), (1, -2)],
-    'rhombus': [(0, 0), (2, 0), (3, 1), (1, 1)],
-    'star': [(0, 0), (2, 0), (3, 2), (4, 0), (6, 0), (4, -1), (5, -3), (3, -2), (1, -3), (2, -1)],
+    'hourglass': [(0, 0), (4, 0), (3, 3), (4, 6), (0, 6), (1, 3)],
+    'star': [(0, 0), (3, 5), (6, 0), (0, 3), (6, 3)],
     'trapezoid': [(0, 0), (1, 2), (4, 2), (5, 0)],
     'square': [(0, 0), (0, 2), (2, 2), (2, 0)],
     'rectangle': [(0, 0), (0, 2), (4, 2), (4, 0)],
@@ -45,7 +45,7 @@ shapes = {
     'e': [(0, 0), (-2, 0), (-2, -2), (0, -2), (-2, -2), (-2, -4), (0, -4)],
     'j': [(0, 0), (2, 0), (2, -4), (0, -4), (0, -2)],
     'l': [(0, 0), (0, -4), (2, -4)],
-    'm': [(0, 0), (0, 2), (1, 2), (1, 0), (1, 2), (2, 2), (2, 0)],
+    'm': [(0, 0), (0, 2), (2, 2), (2, 0), (2, 2), (4, 2), (4, 0)],
     'n': [(0, 0), (0, 2), (2, 2), (2, 0)],
     'p': [(0, 0), (0, 4), (2, 4), (2, 2), (0, 2)],
     'u': [(0, 0), (0, -2), (2, -2), (2, 0)],
@@ -129,7 +129,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity,
+            intensity=vibration_intensity/2,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b110000,
             pattern_iterations=None,
@@ -144,7 +144,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity,
+            intensity=vibration_intensity/2,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b101000,
             pattern_iterations=None,
@@ -159,7 +159,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity,
+            intensity=vibration_intensity/2,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b010100,
             pattern_iterations=None,
@@ -174,7 +174,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity,
+            intensity=vibration_intensity/2,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b001100,
             pattern_iterations=None,
@@ -208,15 +208,15 @@ def simulate_tactile_feedback(shape, speed=1):
 shapes_to_detect_1 = ['square', 'octagon', 'cross', 'seven', 'diamond', 'one', 'triangle', 
                       'two', 'w', 'kite', 'rectangle', 'nine', 'c', 'j', 'four', 'star', 'n', 
                       'pentagon', 'p', 'z', 'hexagon', 'u', 'l', 'three', 'v', 'six', 'e', 
-                      'rhombus', 'm', 'eight', 'five', 'parallelogram', 'r', 'arrow', 'trapezoid']
+                      'hourglass', 'm', 'eight', 'five', 'parallelogram', 'r', 'arrow', 'trapezoid']
 
 shapes_to_detect_2 = ['parallelogram', 'e', 'arrow', 'r', 'six', 'p', 'one', 'seven', 'square', 
                       'u', 'n', 'pentagon', 'diamond', 'j', 'three', 'v', 'triangle', 'star', 'm', 
                       'five', 'rectangle', 'four', 'hexagon', 'kite', 'nine', 'octagon', 'eight', 
-                      'w', 'trapezoid', 'cross', 'z', 'rhombus', 'c', 'l', 'two']
+                      'w', 'trapezoid', 'cross', 'z', 'hourglass', 'c', 'l', 'two']
 
 shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine', 'eight', 'm', 
-                      'seven', 'kite', 'rectangle', 'c', 'three', 'u', 'rhombus', 'five', 'star', 
+                      'seven', 'kite', 'rectangle', 'c', 'three', 'u', 'hourglass', 'five', 'star', 
                       'six', 'e', 'diamond', 'square', 'j', 'parallelogram', 'trapezoid', 'pentagon', 
                       'w', 'octagon', 'p', 'z', 'four', 'one', 'v', 'triangle']
 
@@ -224,7 +224,7 @@ shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine',
 for index, shape in enumerate(shapes_to_detect_1):
     time.sleep(3)
     print(shape)
-    simulate_tactile_feedback(shape, speed=1.5)
+    simulate_tactile_feedback(shape, speed=1)
     print("stop \n")  # Adding a newline for better readability between shapes
     if belt_controller:
         belt_controller.stop_vibration()
