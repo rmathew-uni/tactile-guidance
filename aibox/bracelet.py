@@ -134,7 +134,8 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
 
     print(f"{xc_hand},{yc_hand},{xc_target},{yc_target}")
     print(depth_img.shape, roi.shape)
-    print(depth_img[int(yc_hand), int(xc_hand)])
+    if yc_hand < 480 and xc_hand > 640:
+        print(depth_img[int(yc_hand), int(xc_hand)])
 
     """xyxy = xywh2xyxy(np.array(roi))
     label = "ROI"

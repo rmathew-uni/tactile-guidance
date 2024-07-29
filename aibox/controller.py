@@ -345,7 +345,7 @@ class BraceletController(AutoAssign):
                 mean_diff = np.mean(diff)
                 std_diff = np.std(diff)
                 print(f'Frames mean difference: {mean_diff}, SD: {std_diff}')
-                if mean_diff > 20: # Big change between frames
+                if mean_diff > 30: # Big change between frames
                     print('High change between frames. Resetting predictions.')
                     outputs = []
                 #cv2.imshow('Diff',diff)
