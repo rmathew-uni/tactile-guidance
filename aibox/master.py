@@ -102,6 +102,8 @@ if __name__ == '__main__':
                         run_depth_estimator=run_depth_estimator,
                         mock_navigate=mock_navigate,
                         belt_controller=belt_controller,
+                        tracker_max_age=10,
+                        tracker_n_init=5,
                         target_objs = ['bottle' for _ in range(5)]) # debugging
         
         bracelet_controller.run()

@@ -165,20 +165,20 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     return int(right_intensity), int(left_intensity), int(top_intensity), int(bottom_intensity), depth_intensity
 
 
-def check_overlap(handBB, targetBB, freezed_width, freezed_height, freezed=False):
+def check_overlap(handBB, targetBB, frozen_x, frozen_y, freezed_width, freezed_height, freezed=False):
 
     # Get BB information
     hand_x, hand_y, hand_w, hand_h = handBB[:4]
-    target_x, target_y = targetBB[:2]
     if freezed:
-        target_w, target_h = freezed_width, freezed_height
+        target_x, target_y, target_w, target_h = frozen_x, frozen_y, freezed_width, freezed_height
     else:
+        target_x, target_y = targetBB[:2]
         target_w, target_h = targetBB[2:4]
 
     # First iteration
     if freezed_width == -1 or freezed_height == -1:
         tbbw, tbbh = targetBB[2:4]
-        return False, tbbw, tbbh, freezed
+        return False, target_x, target_y, tbbw, tbbh, freezed
 
     # Calculate BB bounds to check for overlap
     hand_right = hand_x + hand_w//2
@@ -205,22 +205,24 @@ def check_overlap(handBB, targetBB, freezed_width, freezed_height, freezed=False
         #print('Touched!')
         # only if the center of the is in the targetBB send the grasp signal
         if (target_left <= hand_x <= target_right) and (target_top <= hand_y <= target_bottom):
-            return True, freezed_width, freezed_height, freezed
+            return True, frozen_x, frozen_y, freezed_width, freezed_height, freezed
         else:
-            return False, freezed_width, freezed_height, freezed
+            return False, frozen_x, frozen_y, freezed_width, freezed_height, freezed
     # Else, update targetBB size
     else:
         freezed = False
         #print('Updated BB size.')
         tbbw, tbbh = targetBB[2:4]
-        return False, tbbw, tbbh, freezed
+        return False, target_x, target_y, tbbw, tbbh, freezed
 
 
 # GLOBALS
 max_intensity = calibrate_intensity()
 searching = False
 prev_hand = None
-prev_target = None 
+prev_target = None
+frozen_x = -1
+frozen_y = -1
 freezed_tbbw = -1
 freezed_tbbh = -1
 freezed = False
@@ -256,6 +258,8 @@ def navigate_hand(
     global searching
     global prev_hand
     global prev_target
+    global frozen_x
+    global frozen_y
     global freezed_tbbw
     global freezed_tbbh
     global freezed
@@ -272,13 +276,16 @@ def navigate_hand(
     bboxes_objects = [detection for detection in bboxes if detection[5] == target_cls]
     target = choose_detection(bboxes_objects, prev_target)
     prev_target = target
+    print(target)
  
     if hand is not None and target is not None:
         # Get varying vibration intensities depending on angle from hand to target
         right_int, left_int, top_int, bot_int, depth_int = get_intensity(hand, target, max_intensity, depth_img)
         print(f'Vibration intensitites. Right: {right_int}, Left: {left_int}, Top: {top_int}, Bottom: {bot_int}.')
         # Check whether the hand is overlapping the target and freeze targetBB size if necessary (to avoid BB shrinking on occlusion)
-        overlapping, freezed_tbbw, freezed_tbbh, freezed = check_overlap(hand, target, freezed_tbbw, freezed_tbbh, freezed)
+        overlapping, frozen_x, frozen_y, freezed_tbbw, freezed_tbbh, freezed = check_overlap(hand, target, frozen_x, frozen_y, freezed_tbbw, freezed_tbbh, freezed)
+        frozen_target = target.copy()
+        frozen_target[0], frozen_target[1], frozen_target[2], frozen_target[3] = frozen_x, frozen_y, freezed_tbbw, freezed_tbbh
 
     # 1. Grasping
     if overlapping:
@@ -300,7 +307,7 @@ def navigate_hand(
                             clear_other_channels=False
                             )
         print("G R A S P !")
-        return overlapping
+        return overlapping, frozen_target
 
 
     # 2. Guidance
@@ -370,7 +377,7 @@ def navigate_hand(
             exclusive_channel=False,
             clear_other_channels=False
             )
-        return overlapping
+        return overlapping, frozen_target
 
 
     # 3. Target is located and hand can be moved into the frame
@@ -398,7 +405,7 @@ def navigate_hand(
             searching = True
             timer = 0
         print('Target found.', searching, timer)
-        return overlapping
+        return overlapping, target
     
 
     # 4. Target is not in the frame yet.
@@ -406,4 +413,4 @@ def navigate_hand(
         timer = 0
         searching = True
         print('Target not found yet.')
-        return overlapping
+        return overlapping, None
