@@ -129,7 +129,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity/2,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b110000,
             pattern_iterations=None,
@@ -144,7 +144,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity/2,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b101000,
             pattern_iterations=None,
@@ -159,7 +159,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity/2,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b010100,
             pattern_iterations=None,
@@ -174,7 +174,7 @@ def calculate_direction_and_time(start, end, speed=1):
             belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=vibration_intensity/2,
+            intensity=vibration_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b001100,
             pattern_iterations=None,
@@ -224,7 +224,7 @@ shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine',
 for index, shape in enumerate(shapes_to_detect_1):
     time.sleep(3)
     print(shape)
-    simulate_tactile_feedback(shape, speed=1)
+    simulate_tactile_feedback(shape)
     print("stop \n")  # Adding a newline for better readability between shapes
     if belt_controller:
         belt_controller.stop_vibration()

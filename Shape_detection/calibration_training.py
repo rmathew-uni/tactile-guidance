@@ -107,7 +107,7 @@ def vibrate_direction(direction):
         belt_controller.send_vibration_command(            
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=calibrated_intensity/2,
+            intensity=calibrated_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b110000,
             pattern_iterations=None,
@@ -119,7 +119,7 @@ def vibrate_direction(direction):
         belt_controller.send_vibration_command(
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=calibrated_intensity/2,
+            intensity=calibrated_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b101000,
             pattern_iterations=None,
@@ -131,7 +131,7 @@ def vibrate_direction(direction):
         belt_controller.send_vibration_command(           
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=calibrated_intensity/2,
+            intensity=calibrated_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b010100,
             pattern_iterations=None,
@@ -143,7 +143,7 @@ def vibrate_direction(direction):
         belt_controller.send_vibration_command(            
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
-            intensity=calibrated_intensity/2,
+            intensity=calibrated_intensity,
             orientation_type=BeltOrientationType.BINARY_MASK,
             orientation=0b001100,
             pattern_iterations=None,
