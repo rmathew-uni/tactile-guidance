@@ -3,6 +3,9 @@ import random
 import time
 import sys
 import keyboard
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
 from auto_connect import interactive_belt_connect, setup_logger
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
@@ -38,12 +41,12 @@ def calibrate_intensity():
         print(f'Vibrating at intensity {intensity}.')
         user_input = input('Is this intensity sufficient? (yes/no): ').strip().lower()
         if user_input == 'yes':
-            belt_controller.stop_vibration()
+            belt_controller.stop_vibration()     
             return intensity
         intensity += 5
         if intensity > 100:  # Maximum intensity cap
             print('Reached maximum intensity.')
-            belt_controller.stop_vibration()
+            belt_controller.stop_vibration()     
             return intensity
 
 # Calibrate the bracelet intensity
@@ -51,11 +54,11 @@ calibrated_intensity = calibrate_intensity()
 print(f'Calibrated intensity: {calibrated_intensity}')
 
 # Directions for training
-directions = ['top', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
+directions = ['up', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
 
 # Function to send vibration for a given direction
 def vibrate_direction(direction):
-    if direction == 'top':
+    if direction == 'up':
         belt_controller.send_vibration_command(            
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
@@ -186,6 +189,7 @@ def capture_direction():
 
 # Familiarization phase
 def familiarization_phase():
+    time.sleep(5)
     print("Familiarization Phase: Please press the corresponding arrow keys for each vibration.")
     for direction in directions:
         print(f"Vibrating for {direction}.")
@@ -197,22 +201,31 @@ def familiarization_phase():
 
 # Training function
 def training_task():
+    print("Training start will start")
     correct_responses_per_block = []
     blocks = 3
     trials_per_block = 16
+    block_accuracies = []
+    actual_directions =[]
+    predicted_directions = []
 
     for block in range(blocks):
         correct_responses = 0
+        time.sleep(5)
         for trial in range(trials_per_block):
             direction = random.choice(directions)
             print(f"Trial {block * trials_per_block + trial + 1}: Vibration direction is {direction}.")
             vibrate_direction(direction)
             user_response = capture_direction()
             print(f"User response: {user_response}")
+            belt_controller.stop_vibration()
+            time.sleep(1)
+            actual_directions.append(direction)
+            predicted_directions.append(user_response)
+
             if user_response == direction:
                 correct_responses += 1
-            time.sleep(1)  # Short delay between trials
-        
+
         # Stop vibration after completing a block with custom stop signal
         if belt_controller:
             belt_controller.stop_vibration()
@@ -220,7 +233,7 @@ def training_task():
                 channel_index=0,
                 orientation_type=BeltOrientationType.BINARY_MASK,
                 orientation=0b111100,
-                intensity=100,
+                intensity=calibrated_intensity,
                 on_duration_ms=150,
                 pulse_period=500,
                 pulse_iterations=5, 
@@ -229,24 +242,45 @@ def training_task():
                 timer_option=BeltVibrationTimerOption.RESET_TIMER,
                 exclusive_channel=False,
                 clear_other_channels=False)
-
+            
         # Calculate accuracy for the block
         block_accuracy = (correct_responses / trials_per_block) * 100
-        correct_responses_per_block.append(block_accuracy)
+        block_accuracies.append(block_accuracy)
         print(f"Block {block + 1} complete. Accuracy: {block_accuracy:.2f}%")
-
+        
     # Calculate and display the average accuracy across all blocks
-    average_accuracy = sum(correct_responses_per_block) / blocks
+    average_accuracy = np.mean(block_accuracies)
     print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
-    return average_accuracy
+    print(f"Actual direction {actual_directions}")
+    print(f"Predicted direction {predicted_directions}")
+
+    cm = confusion_matrix(actual_directions, predicted_directions, labels=directions)
+    plot_confusion_matrix (cm, directions)
+
+    return average_accuracy, block_accuracies
+
+# Plot the confusion matrix
+def plot_confusion_matrix(cm, labels):
+    plt.figure(figsize=(10,7))
+    sns.heatmap(cm, annot= True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    plt.ylabel('Actual')
+    plt.xlabel('Predicted')
+    plt.title('Confusion Matrix of Vibration Directions')
+    plt.show()
 
 # Run familiarization phase
 familiarization_phase()
 
 # Run training task
-training_accuracy = training_task()
+training_accuracy, block_accuracies = training_task()
+print(f"Selected intensity after training: {calibrated_intensity}")
+print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
 if training_accuracy >= 90:
+    print(f"Selected intensity after training: {calibrated_intensity}")
+    print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
     print(f"Training completed with an accuracy of {training_accuracy:.2f}%")
-else:
+else: 
+    print(f"Selected intensity after training: {calibrated_intensity}")
+    print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
     print(f"Training accuracy below 90% with an accuracy of {training_accuracy:.2f}%")
     sys.exit()
