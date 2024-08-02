@@ -28,7 +28,7 @@ def calibrate_intensity():
                 pattern=BeltVibrationPattern.CONTINUOUS,
                 intensity=intensity,
                 orientation_type=BeltOrientationType.ANGLE,
-                orientation=60,  #down
+                orientation=60,  # down
                 pattern_iterations=None,
                 pattern_period=500,
                 pattern_start_time=0,
@@ -184,29 +184,64 @@ def capture_direction():
                 return 'bottom left'
             return 'left'
 
+# Familiarization phase
+def familiarization_phase():
+    print("Familiarization Phase: Please press the corresponding arrow keys for each vibration.")
+    for direction in directions:
+        print(f"Vibrating for {direction}.")
+        vibrate_direction(direction)
+        user_response = capture_direction()
+        print(f"User response: {user_response}")
+        belt_controller.stop_vibration()
+        time.sleep(1)  # Short delay between each familiarization trial
+
 # Training function
 def training_task():
-    correct_responses = 0
-    total_trials = 0
+    correct_responses_per_block = []
     blocks = 3
     trials_per_block = 16
 
     for block in range(blocks):
+        correct_responses = 0
         for trial in range(trials_per_block):
             direction = random.choice(directions)
-            print(f"Trial {total_trials + 1}: Vibration direction is {direction}.")
+            print(f"Trial {block * trials_per_block + trial + 1}: Vibration direction is {direction}.")
             vibrate_direction(direction)
             user_response = capture_direction()
             print(f"User response: {user_response}")
             if user_response == direction:
                 correct_responses += 1
-            total_trials += 1
             time.sleep(1)  # Short delay between trials
-        print(f"Block {block + 1} complete.")
-    
-    accuracy = (correct_responses / total_trials) * 100
-    print(f"Training completed with an accuracy of {accuracy:.2f}%")
-    return accuracy
+        
+        # Stop vibration after completing a block with custom stop signal
+        if belt_controller:
+            belt_controller.stop_vibration()
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=100,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5, 
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+
+        # Calculate accuracy for the block
+        block_accuracy = (correct_responses / trials_per_block) * 100
+        correct_responses_per_block.append(block_accuracy)
+        print(f"Block {block + 1} complete. Accuracy: {block_accuracy:.2f}%")
+
+    # Calculate and display the average accuracy across all blocks
+    average_accuracy = sum(correct_responses_per_block) / blocks
+    print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
+    return average_accuracy
+
+# Run familiarization phase
+familiarization_phase()
 
 # Run training task
 training_accuracy = training_task()
