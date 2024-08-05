@@ -211,8 +211,7 @@ categories = {
     'numbers': ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
     'shapes': ['square', 'rectangle', 'cross'],
     'letters': ['c', 'e', 'j', 'l', 'm', 'n', 'u', 'p'],
-    'beta': ['arrow', 'diamond', 'hexagon', 'kite', 'octagon', 'parallelogram', 
-             'pentagon', 'r', 'v', 'w', 'z', 'trapezoid', 'triangle', 'star']
+    'beta': ['arrow', 'diamond', 'hexagon', 'kite', 'octagon', 'parallelogram', 'pentagon', 'trapezoid', 'triangle', 'star', 'r', 'v', 'w', 'z']
 }
 
 # Shuffle the items within each category for each participant
