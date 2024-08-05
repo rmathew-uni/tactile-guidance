@@ -191,13 +191,20 @@ def capture_direction():
 def familiarization_phase():
     time.sleep(5)
     print("Familiarization Phase: Please press the corresponding arrow keys for each vibration.")
+    
     for direction in directions:
-        print(f"Vibrating for {direction}.")
-        vibrate_direction(direction)
-        user_response = capture_direction()
-        print(f"User response: {user_response}")
-        belt_controller.stop_vibration()
-        time.sleep(1)  # Short delay between each familiarization trial
+        while True:
+            print(f"Vibrating for {direction}.")
+            vibrate_direction(direction)
+            user_response = capture_direction()
+            print(f"User response: {user_response}")
+            belt_controller.stop_vibration()
+            time.sleep(1)  # Short delay between each trial
+            
+            if user_response == direction:
+                break  # Exit the loop if the user response is correct
+            else:
+                print("Incorrect response. Please try again.")
 
 # Training function
 def training_task():
@@ -271,12 +278,21 @@ familiarization_phase()
 
 # Run training task
 training_accuracy, block_accuracies = training_task()
+
+# Print out the block accuracy and average block accuracy
+print(f"Selected intensity after training: {calibrated_intensity}")
+
+# Print each block's accuracy
+for i, accuracy in enumerate(block_accuracies, start=1):
+    print(f"Block {i} accuracy: {accuracy:.2f}%")
+
+# Print the average accuracy
+print(f"Average block accuracy: {np.mean(block_accuracies):.2f}%")
+
+# Determine if the training accuracy is sufficient
 if training_accuracy >= 90:
-    print(f"Selected intensity after training: {calibrated_intensity}")
-    print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
     print(f"Training completed with an accuracy of {training_accuracy:.2f}%")
 else: 
-    print(f"Selected intensity after training: {calibrated_intensity}")
-    print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
     print(f"Training accuracy below 90% with an accuracy of {training_accuracy:.2f}%")
     sys.exit()
+
