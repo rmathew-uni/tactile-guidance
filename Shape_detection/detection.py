@@ -1,21 +1,22 @@
 import numpy as np
 import time
 import sys
+import random
 from auto_connect import interactive_belt_connect, setup_logger
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption, BeltVibrationPattern)
-
 from bracelet import connect_belt
 
+# Connect to the belt
 connection_check, belt_controller = connect_belt()
 if connection_check:
     print('Bracelet connection successful.')
 else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
-                                    
+
 # Define shapes with vertices
 shapes = {
     'arrow': [(0, 0), (3, 0), (3, 2), (6, -1), (3, -4), (3, -2), (0, -2)],
@@ -187,68 +188,63 @@ def calculate_direction_and_time(start, end, speed=1):
     else:
         return 'none', 0
     
-# Function to detect outline and simulate tactile feedback
+
+# Function to simulate tactile feedback based on shape
 def simulate_tactile_feedback(shape, speed=1):
     vertices = shapes[shape]
-    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
+    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
                  'c', 'e', 'j', 'l', 'm', 'n', 'p', 'u', 'r', 'v', 'w', 'z']:
         vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
     else:
         vertices.append(vertices[0])  # Close the shape by returning to the starting point
-    
+
     for i in range(len(vertices) - 1):
         start = vertices[i]
         end = vertices[i + 1]
         direction, time_required = calculate_direction_and_time(start, end, speed)
         if direction != 'none':
-            print(f"Move {direction} for {time_required:.2f} seconds")
+            print(f"{direction} for {time_required:.2f} seconds")
             time.sleep(time_required)  # Simulate the time required for the movement
 
-# List of shapes to loop through
-shapes_to_detect_1 = ['square', 'octagon', 'cross', 'seven', 'diamond', 'one', 'triangle', 
-                      'two', 'w', 'kite', 'rectangle', 'nine', 'c', 'j', 'four', 'star', 'n', 
-                      'pentagon', 'p', 'z', 'hexagon', 'u', 'l', 'three', 'v', 'six', 'e', 
-                      'hourglass', 'm', 'eight', 'five', 'parallelogram', 'r', 'arrow', 'trapezoid']
+# Define the categories and their items
+categories = {
+    'numbers': ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
+    'shapes': ['square', 'rectangle', 'cross'],
+    'letters': ['c', 'e', 'j', 'l', 'm', 'n', 'u', 'p'],
+    'beta': ['arrow', 'diamond', 'hexagon', 'kite', 'octagon', 'parallelogram', 
+             'pentagon', 'r', 'v', 'w', 'z', 'trapezoid', 'triangle', 'star']
+}
 
-shapes_to_detect_2 = ['parallelogram', 'e', 'arrow', 'r', 'six', 'p', 'one', 'seven', 'square', 
-                      'u', 'n', 'pentagon', 'diamond', 'j', 'three', 'v', 'triangle', 'star', 'm', 
-                      'five', 'rectangle', 'four', 'hexagon', 'kite', 'nine', 'octagon', 'eight', 
-                      'w', 'trapezoid', 'cross', 'z', 'hourglass', 'c', 'l', 'two']
+# Shuffle the items within each category for each participant
+for category, items in categories.items():
+    random.shuffle(items)
 
-shapes_to_detect_3 = ['two', 'hexagon', 'n', 'l', 'cross', 'arrow', 'r', 'nine', 'eight', 'm', 
-                      'seven', 'kite', 'rectangle', 'c', 'three', 'u', 'hourglass', 'five', 'star', 
-                      'six', 'e', 'diamond', 'square', 'j', 'parallelogram', 'trapezoid', 'pentagon', 
-                      'w', 'octagon', 'p', 'z', 'four', 'one', 'v', 'triangle']
+# Execute drawing tasks for each category sequentially
+for category, items in categories.items():
+    print(f"Starting category: {category}")
+    for index, item in enumerate(items):
+        time.sleep(3)
+        print(item)
+        simulate_tactile_feedback(item)
+        print("stop \n")
+        if belt_controller:
+            belt_controller.stop_vibration()
+            belt_controller.send_pulse_command(
+                channel_index=0,
+                orientation_type=BeltOrientationType.BINARY_MASK,
+                orientation=0b111100,
+                intensity=100,
+                on_duration_ms=150,
+                pulse_period=500,
+                pulse_iterations=5,
+                series_period=5000,
+                series_iterations=1,
+                timer_option=BeltVibrationTimerOption.RESET_TIMER,
+                exclusive_channel=False,
+                clear_other_channels=False)
+        time.sleep(4)  # Pause after each shape
 
-# Loop through the shapes
-for index, shape in enumerate(shapes_to_detect_1):
-    time.sleep(3)
-    print(shape)
-    simulate_tactile_feedback(shape)
-    print("stop \n")  # Adding a newline for better readability between shapes
-    if belt_controller:
-        belt_controller.stop_vibration()
-        belt_controller.send_pulse_command(
-            channel_index=0,
-            orientation_type=BeltOrientationType.BINARY_MASK,
-            orientation=0b111100,
-            intensity=100,
-            on_duration_ms=150,
-            pulse_period=500,
-            pulse_iterations=5, 
-            series_period=5000,
-            series_iterations=1,
-            timer_option=BeltVibrationTimerOption.RESET_TIMER,
-            exclusive_channel=False,
-            clear_other_channels=False)
-    time.sleep(4)  # Pause for 3 seconds after each shape
-    
-    # Add a 5-second rest after every 5 shapes
-    if (index + 1) % 5 == 0:
-        print("5-second rest \n")
-        time.sleep(5)
-
-
-# Example usage
-# shape_to_detect = 'nine'  # Change to 'rectangle', 'triangle', 'polygon' as needed
-# simulate_tactile_feedback(shape_to_detect)
+        # Add a 5-second rest after every 5 items within the category
+        if (index + 1) % 5 == 0:
+            print("5-second rest \n")
+            time.sleep(5)
