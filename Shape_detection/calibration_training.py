@@ -54,11 +54,11 @@ calibrated_intensity = calibrate_intensity()
 print(f'Calibrated intensity: {calibrated_intensity}')
 
 # Directions for training
-directions = ['up', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
+directions = ['top', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
 
 # Function to send vibration for a given direction
 def vibrate_direction(direction):
-    if direction == 'up':
+    if direction == 'top':
         belt_controller.send_vibration_command(            
             channel_index=0,
             pattern=BeltVibrationPattern.CONTINUOUS,
@@ -190,7 +190,7 @@ def capture_direction():
 # Familiarization phase
 def familiarization_phase():
     time.sleep(5)
-    print("Familiarization Phase: Please press the corresponding arrow keys for each vibration.")
+    print("\nFamiliarization Phase: Please press the corresponding arrow keys for each vibration.")
     
     for direction in directions:
         while True:
@@ -208,7 +208,7 @@ def familiarization_phase():
 
 # Training function
 def training_task():
-    print("Training start will start")
+    print("\nTraining start will start")
     correct_responses_per_block = []
     blocks = 3
     trials_per_block = 16
@@ -254,45 +254,38 @@ def training_task():
         # Calculate accuracy for the block
         block_accuracy = (correct_responses / trials_per_block) * 100
         block_accuracies.append(block_accuracy)
-        print(f"Block {block + 1} complete. Accuracy: {block_accuracy:.2f}%")
+        print(f"Block {block + 1} complete. Accuracy: {block_accuracy:.2f}%\n")
         
     # Calculate and display the average accuracy across all blocks
     average_accuracy = np.mean(block_accuracies)
+    print(f"Selected intensity after training: {calibrated_intensity}")
+    print(f"Block accuracy: {block_accuracies}")
     print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
 
-    matrix = confusion_matrix(actual_directions, predicted_directions, labels=directions)
-    
+    # Confusion matrix
+    matrix = confusion_matrix(actual_directions, predicted_directions, labels = directions)
+
     #Plot the confusion matrix
     plt.figure(figsize=(10,8))
-    sns.heatmap(matrix, annot= True, fmt='d', cmap='Blues', xticklabels=directions, yticklabels=directions)
+    sns.heatmap(matrix, annot= True, fmt='d', cmap='Blues', cbar=False, xticklabels=directions, yticklabels=directions)
     plt.ylabel('Actual')
     plt.xlabel('Predicted')
     plt.title('Confusion Matrix of Vibration Directions')
     plt.show()
 
-    return average_accuracy, block_accuracies
+    # Determine if the training accuracy is sufficient
+    if average_accuracy >= 90:
+        print(f"Training completed with an accuracy of {average_accuracy:.2f}%")
+    else: 
+        print(f"Training accuracy below 90% with an accuracy of {average_accuracy:.2f}%")
+        sys.exit()
+
+    return average_accuracy, block_accuracies, actual_directions, predicted_directions
 
 
 # Run familiarization phase
 familiarization_phase()
 
 # Run training task
-training_accuracy, block_accuracies = training_task()
-
-# Print out the block accuracy and average block accuracy
-print(f"Selected intensity after training: {calibrated_intensity}")
-
-# Print each block's accuracy
-for i, accuracy in enumerate(block_accuracies, start=1):
-    print(f"Block {i} accuracy: {accuracy:.2f}%")
-
-# Print the average accuracy
-print(f"Average block accuracy: {np.mean(block_accuracies):.2f}%")
-
-# Determine if the training accuracy is sufficient
-if training_accuracy >= 90:
-    print(f"Training completed with an accuracy of {training_accuracy:.2f}%")
-else: 
-    print(f"Training accuracy below 90% with an accuracy of {training_accuracy:.2f}%")
-    sys.exit()
+training_accuracy, block_accuracies, actual_directions, predicted_directions = training_task()
 
