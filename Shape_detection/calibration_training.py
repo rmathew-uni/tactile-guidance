@@ -212,6 +212,7 @@ def training_task():
     for block in range(blocks):
         correct_responses = 0
         time.sleep(5)
+        
         for trial in range(trials_per_block):
             direction = random.choice(directions)
             print(f"Trial {block * trials_per_block + trial + 1}: Vibration direction is {direction}.")
@@ -251,30 +252,25 @@ def training_task():
     # Calculate and display the average accuracy across all blocks
     average_accuracy = np.mean(block_accuracies)
     print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
-    print(f"Actual direction {actual_directions}")
-    print(f"Predicted direction {predicted_directions}")
 
-    cm = confusion_matrix(actual_directions, predicted_directions, labels=directions)
-    plot_confusion_matrix (cm, directions)
-
-    return average_accuracy, block_accuracies
-
-# Plot the confusion matrix
-def plot_confusion_matrix(cm, labels):
-    plt.figure(figsize=(10,7))
-    sns.heatmap(cm, annot= True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
+    matrix = confusion_matrix(actual_directions, predicted_directions, labels=directions)
+    
+    #Plot the confusion matrix
+    plt.figure(figsize=(10,8))
+    sns.heatmap(matrix, annot= True, fmt='d', cmap='Blues', xticklabels=directions, yticklabels=directions)
     plt.ylabel('Actual')
     plt.xlabel('Predicted')
     plt.title('Confusion Matrix of Vibration Directions')
     plt.show()
+
+    return average_accuracy, block_accuracies
+
 
 # Run familiarization phase
 familiarization_phase()
 
 # Run training task
 training_accuracy, block_accuracies = training_task()
-print(f"Selected intensity after training: {calibrated_intensity}")
-print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
 if training_accuracy >= 90:
     print(f"Selected intensity after training: {calibrated_intensity}")
     print(f"Block complete. Accuracy: {block_accuracies:.2f}%")
