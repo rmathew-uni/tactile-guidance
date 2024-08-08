@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 # Define shapes with vertices
 shapes = {
@@ -40,19 +41,14 @@ shapes = {
     'z': [(0, 0), (2, 0), (0, -2), (2, -2)]
 }
 
-# Function to calculate direction and time
-def calculate_direction_and_time(start, end, speed=1):
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
-    distance = np.sqrt(dx**2 + dy**2)
-    time_required = distance / speed
-    return '', time_required  # Simplified for visualization
+# Function to visualize and save shapes
+def visualize_and_save_shapes(shapes, save_path, speed=1):
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
-# Function to visualize shapes
-def visualize_shapes(shapes, speed=1):
     for shape_name, vertices in shapes.items():
         plt.figure()
-        plt.title(f"Shape: {shape_name}")
+        plt.axis('off')  # Turn off the axis
         
         if shape_name in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 
                           'c', 'e', 'j', 'l', 'm', 'n', 'p', 'u', 'r', 'v', 'w', 'z']:
@@ -63,14 +59,16 @@ def visualize_shapes(shapes, speed=1):
         for i in range(len(vertices) - 1):
             start = vertices[i]
             end = vertices[i + 1]
-            direction, time_required = calculate_direction_and_time(start, end, speed)
-            
-            # Plot the line segment
             plt.plot([start[0], end[0]], [start[1], end[1]], marker='o')
-            plt.text((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, f'{time_required:.2f}s', fontsize=9)
-        
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
 
-# Visualize all shapes
-visualize_shapes(shapes)
+        plt.gca().set_aspect('equal', adjustable='box')
+        
+        # Save the figure as a JPEG file
+        plt.savefig(os.path.join(save_path, f"{shape_name}.jpg"), bbox_inches='tight', pad_inches=0, format='jpg')
+        plt.close()
+
+# Path to save the figures
+save_path = r"D:\WWU\M8 - Master Thesis\Project\Code\Images"
+
+# Visualize and save all shapes
+visualize_and_save_shapes(shapes, save_path)
