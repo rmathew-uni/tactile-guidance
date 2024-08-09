@@ -2,6 +2,7 @@ import numpy as np
 import random
 import time
 import sys
+import pandas as pd
 import keyboard
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
@@ -11,6 +12,7 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption, BeltVibrationPattern)
+from pybelt.belt_scanner import BeltScanner
 
 from bracelet import connect_belt
 
@@ -20,6 +22,71 @@ if connection_check:
 else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
+
+def interactive_belt_connect(belt_controller):
+    """Interactive procedure to connect a belt. The interface to use is asked via the console.
+
+    :param BeltController belt_controller: The belt controller to connect.
+    """
+
+    interface = 'u'
+    if interface.lower() == "b":
+        # Scan for advertising belt
+        with pybelt.belt_scanner.create() as scanner:
+            print("Start BLE scan.")
+            belts = scanner.scan()
+            print("BLE scan completed.")
+        if len(belts) == 0:
+            print("No belt found.")
+            return belt_controller
+        if len(belts) > 1:
+            print("Select the belt to connect.")
+            for i, belt in enumerate(belts):
+                print("{}. {} - {}".format((i + 1), belt.name, belt.address))
+            belt_selection = input("[1-{}]".format(len(belts)))
+            try:
+                belt_selection_int = int(belt_selection)
+            except ValueError:
+                print("Unrecognized input.")
+                return belt_controller
+            print("Connect the belt.")
+            belt_controller.connect(belts[belt_selection_int - 1])
+        else:
+            print("Connect the belt.")
+            belt_controller.connect(belts[0])
+
+    elif interface.lower() == "u":
+        # List serial COM ports
+        ports = serial.tools.list_ports.comports()
+        if ports is None or len(ports) == 0:
+            print("No serial port found.")
+            return belt_controller
+        if len(ports) == 1:
+            connect_ack = 'y'
+            if connect_ack.lower() == "y" or connect_ack.lower() == "yes":
+                print("Connect the belt.")
+                belt_controller.connect(ports[0][0])
+            else:
+                print("Unrecognized input.")
+                return belt_controller
+        else:
+            print("Select the serial COM port to use.")
+            for i, port in enumerate(ports):
+                print("{}. {}".format((i + 1), port[0]))
+            belt_selection = input("[1-{}]".format(len(ports)))
+            try:
+                belt_selection_int = int(belt_selection)
+            except ValueError:
+                print("Unrecognized input.")
+                return belt_controller
+            print("Connect the belt.")
+            belt_controller.connect(ports[belt_selection_int - 1][0])
+
+    else:
+        print("Unrecognized input.")
+        return belt_controller
+
+    return belt_controller
 
 # Calibration function to determine optimal vibration intensity
 def calibrate_intensity():
@@ -190,7 +257,7 @@ def capture_direction():
 # Familiarization phase
 def familiarization_phase():
     time.sleep(5)
-    print("\nFamiliarization Phase: Please press the corresponding arrow keys for each vibration.")
+    print("\nFamiliarization Phase")
     
     for direction in directions:
         while True:
@@ -215,21 +282,30 @@ def training_task():
     block_accuracies = []
     actual_directions =[]
     predicted_directions = []
+    response_times = []
 
     for block in range(blocks):
         correct_responses = 0
         time.sleep(5)
-        
-        for trial in range(trials_per_block):
-            direction = random.choice(directions)
+
+        # Create a list with two of each direction and shuffle it
+        block_directions = directions * 2
+        random.shuffle(block_directions)
+
+        for direction in range(block_directions):
             print(f"Trial {block * trials_per_block + trial + 1}: Vibration direction is {direction}.")
             vibrate_direction(direction)
+            start_time = time.time()
             user_response = capture_direction()
+            end_time = time.time()
+            response_time = end_time - start_time
+
             print(f"User response: {user_response}")
             belt_controller.stop_vibration()
             time.sleep(1)
             actual_directions.append(direction)
             predicted_directions.append(user_response)
+            response_times.append(response_time)
 
             if user_response == direction:
                 correct_responses += 1
@@ -254,6 +330,7 @@ def training_task():
         # Calculate accuracy for the block
         block_accuracy = (correct_responses / trials_per_block) * 100
         block_accuracies.append(block_accuracy)
+        correct_responses_per_block.append(correct_responses)
         print(f"Block {block + 1} complete. Accuracy: {block_accuracy:.2f}%\n")
         
     # Calculate and display the average accuracy across all blocks
@@ -262,16 +339,14 @@ def training_task():
     print(f"Block accuracy: {block_accuracies}")
     print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
 
-    # Confusion matrix
-    matrix = confusion_matrix(actual_directions, predicted_directions, labels = directions)
-
-    #Plot the confusion matrix
-    plt.figure(figsize=(10,8))
-    sns.heatmap(matrix, annot= True, fmt='d', cmap='Blues', cbar=False, xticklabels=directions, yticklabels=directions)
-    plt.ylabel('Actual')
-    plt.xlabel('Predicted')
-    plt.title('Confusion Matrix of Vibration Directions')
-    plt.show()
+    # Save result to Excel file
+    results_df = pd.DataFrame({
+        'Actual Direction': actual_directions,
+        'Predicted Direction': predicted_directions,
+        'Response Time (s)': response_times
+    })
+    results_df.to_excel('training_results.xlsx', index = False)
+    print('\nResults saved to training_results.xlsx')
 
     # Determine if the training accuracy is sufficient
     if average_accuracy >= 90:
@@ -287,5 +362,5 @@ def training_task():
 familiarization_phase()
 
 # Run training task
-training_accuracy, block_accuracies, actual_directions, predicted_directions = training_task()
+training_accuracy = training_task()
 
