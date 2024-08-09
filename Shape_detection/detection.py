@@ -8,6 +8,7 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption, BeltVibrationPattern)
 from bracelet import connect_belt
+from pybelt.belt_scanner import BeltScanner
 
 # Connect to the belt
 connection_check, belt_controller = connect_belt()
@@ -17,42 +18,109 @@ else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
 
+def interactive_belt_connect(belt_controller):
+    """Interactive procedure to connect a belt. The interface to use is asked via the console.
+
+    :param BeltController belt_controller: The belt controller to connect.
+    """
+
+    # Ask for the interface
+    #interface = input("Connect via Bluetooth or USB? [b,u]")
+    #interface = ""
+    #print("Connect via Bluetooth or USB? [b,u]", end="")
+    #while interface == "":
+    #    interface = input()
+    interface = 'u'
+    if interface.lower() == "b":
+        # Scan for advertising belt
+        with pybelt.belt_scanner.create() as scanner:
+            print("Start BLE scan.")
+            belts = scanner.scan()
+            print("BLE scan completed.")
+        if len(belts) == 0:
+            print("No belt found.")
+            return belt_controller
+        if len(belts) > 1:
+            print("Select the belt to connect.")
+            for i, belt in enumerate(belts):
+                print("{}. {} - {}".format((i + 1), belt.name, belt.address))
+            belt_selection = input("[1-{}]".format(len(belts)))
+            try:
+                belt_selection_int = int(belt_selection)
+            except ValueError:
+                print("Unrecognized input.")
+                return belt_controller
+            print("Connect the belt.")
+            belt_controller.connect(belts[belt_selection_int - 1])
+        else:
+            print("Connect the belt.")
+            belt_controller.connect(belts[0])
+
+    elif interface.lower() == "u":
+        # List serial COM ports
+        ports = serial.tools.list_ports.comports()
+        if ports is None or len(ports) == 0:
+            print("No serial port found.")
+            return belt_controller
+        if len(ports) == 1:
+            connect_ack = 'y'
+            if connect_ack.lower() == "y" or connect_ack.lower() == "yes":
+                print("Connect the belt.")
+                belt_controller.connect(ports[0][0])
+            else:
+                print("Unrecognized input.")
+                return belt_controller
+        else:
+            print("Select the serial COM port to use.")
+            for i, port in enumerate(ports):
+                print("{}. {}".format((i + 1), port[0]))
+            belt_selection = input("[1-{}]".format(len(ports)))
+            try:
+                belt_selection_int = int(belt_selection)
+            except ValueError:
+                print("Unrecognized input.")
+                return belt_controller
+            print("Connect the belt.")
+            belt_controller.connect(ports[belt_selection_int - 1][0])
+
+    else:
+        print("Unrecognized input.")
+        return belt_controller
+
+    return belt_controller
+
 # Define shapes with vertices
 shapes = {
-    'arrow': [(0, 0), (3, 0), (3, 2), (6, -1), (3, -4), (3, -2), (0, -2)],
-    'cross': [(0, 0), (2, 0), (2, 2), (4, 2), (4, 0), (6, 0), (6, -2), (4, -2), (4, -4), (2, -4), (2, -2), (0, -2)],
-    'hexagon': [(0, 0), (3, 2), (6, 0), (6, -3), (3, -5), (0, -3)],
-    'kite': [(0, 0), (2, 2), (4, 0), (2, -5)],
-    'octagon': [(0, 0), (2, 2), (4, 2), (6, 0), (6, -2), (4, -4), (2, -4), (0, -2)],
-    'parallelogram': [(0, 0), (2, 2), (6, 2), (4, 0)],
-    'pentagon': [(0, 0), (2, 2), (4, 0), (3, -2), (1, -2)],
-    'hourglass': [(0, 0), (4, 0), (3, 3), (4, 6), (0, 6), (1, 3)],
-    'star': [(0, 0), (3, 5), (6, 0), (0, 3), (6, 3)],
-    'trapezoid': [(0, 0), (1, 2), (4, 2), (5, 0)],
-    'square': [(0, 0), (0, 2), (2, 2), (2, 0)],
-    'rectangle': [(0, 0), (0, 2), (4, 2), (4, 0)],
-    'triangle': [(0, 0), (3, 3), (3, 0)],
-    'diamond': [(0, 0), (2, 2), (6, 2), (8, 0), (4, -4)],
-    'one': [(0, 0), (0, -4)],
-    'two': [(0, 0), (2, 0), (2, -2), (0, -2), (0, -4), (2, -4)],
-    'three': [(0, 0), (2, 0), (2, -2), (0, -2), (2, -2), (2, -4), (0, -4)],
-    'four': [(0, 0), (0, -2), (2, -2), (2, 0), (2, -4)],
-    'five': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, -4), (-2, -4)],
-    'six': [(0, 0), (-2, 0), (-2, -4), (0, -4), (0, -2), (-2, -2)],
-    'seven': [(0, 0), (2, 0), (2, -4)],
-    'eight': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, -4), (-2, -4), (-2, -2), (0, -2), (0, 0)],
-    'nine': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, 0), (0, -4), (-2, -4)],
+    '0': [(0, 0), (0, 4), (2, 4), (2, 0), (0, 0)],
+    '1': [(0, 0), (0, -2)],
+    '2': [(0, 0), (2, 0), (2, -2), (0, -2), (0, -4), (2, -4)],
+    '3': [(0, 0), (2, 0), (2, -2), (0, -2), (2, -2), (2, -4), (0, -4)],
+    '4': [(0, 0), (0, -2), (2, -2), (2, 0), (2, -4)],
+    '5': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, -4), (-2, -4)],
+    '6': [(0, 0), (-2, 0), (-2, -4), (0, -4), (0, -2), (-2, -2)],
+    '7': [(0, 0), (2, 0), (2, -4)],
+    '8': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, -4), (-2, -4), (-2, -2), (0, -2), (0, 0)],
+    '9': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, 0), (0, -4), (-2, -4)],
+    'a': [(0, 0), (-2, 0), (-2, -2), (0, -2), (0, 0), (0, -2.5)],
+    'b': [(0, 0), (0, -4), (2, -4), (2, -2), (0, -2)],
     'c': [(0, 0), (-2, 0), (-2, -2), (0, -2)],
-    'e': [(0, 0), (-2, 0), (-2, -2), (0, -2), (-2, -2), (-2, -4), (0, -4)],
+    'd': [(0, 0), (0, -4), (-2, -4), (-2, -2), (0, -2)],
+    'e': [(0, 0), (2, 0), (2, 2), (0, 2), (0, -2), (2, -2)],
+    'f': [(0, 0), (-2, 0), (-2, -4), (-2, -2), (0, -2)],
+    'h': [(0, 0), (0, -4), (0, -2), (2, -2), (2, -4)],
+    'i': [(0, 0), (4, 0), (2, 0), (2, -4), (0, -4), (4, -4)],
     'j': [(0, 0), (2, 0), (2, -4), (0, -4), (0, -2)],
+    'k': [(0, 0), (0, -4), (2, -2), (1, -3), (2, -4)],
     'l': [(0, 0), (0, -4), (2, -4)],
-    'm': [(0, 0), (0, 2), (2, 2), (2, 0), (2, 2), (4, 2), (4, 0)],
-    'n': [(0, 0), (0, 2), (2, 2), (2, 0)],
+    'm': [(0, 0), (0, 4), (2, 2), (4, 4), (4, 0)],
+    'n': [(0, 0), (0, 4), (2, 0), (2, 4)],
     'p': [(0, 0), (0, 4), (2, 4), (2, 2), (0, 2)],
+    'q': [(0, 0), (0, 4), (-2, 4), (-2, 2), (0, 2)],
     'u': [(0, 0), (0, -2), (2, -2), (2, 0)],
     'r': [(0, 0), (0, 4), (2, 4), (2, 2), (0, 2), (2, 0)],
     'v': [(0, 0), (2, -4), (4, 0)],
     'w': [(0, 0), (0, -4), (2, -2), (4, -4), (4, 0)],
+    'y': [(0, 0), (2, -2), (4, 0), (0, -4)],
     'z': [(0, 0), (2, 0), (0, -2), (2, -2)]
 }
 
@@ -79,6 +147,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'right', time_required
     elif dx < 0 and dy == 0:
         if belt_controller:
@@ -94,6 +163,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'left', time_required
     elif dy > 0 and dx == 0:
         if belt_controller:
@@ -109,6 +179,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )     
+            belt_controller.stop_vibration()
             return 'top', time_required
     elif dy < 0 and dx == 0:
         if belt_controller:
@@ -124,6 +195,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'down', time_required
     elif dx > 0 and dy > 0:
         if belt_controller:
@@ -139,6 +211,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'diagonal right top', time_required
     elif dx > 0 and dy < 0:
         if belt_controller:
@@ -154,6 +227,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'diagonal right bottom', time_required
     elif dx < 0 and dy > 0:
         if belt_controller:
@@ -169,6 +243,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'diagonal left top', time_required
     elif dx < 0 and dy < 0:
         if belt_controller:
@@ -184,6 +259,7 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
+            belt_controller.stop_vibration()
             return 'diagonal left bottom', time_required
     else:
         return 'none', 0
@@ -192,11 +268,7 @@ def calculate_direction_and_time(start, end, speed=1):
 # Function to simulate tactile feedback based on shape
 def simulate_tactile_feedback(shape, speed=1):
     vertices = shapes[shape]
-    if shape in ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
-                 'c', 'e', 'j', 'l', 'm', 'n', 'p', 'u', 'r', 'v', 'w', 'z']:
-        vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
-    else:
-        vertices.append(vertices[0])  # Close the shape by returning to the starting point
+    vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
 
     for i in range(len(vertices) - 1):
         start = vertices[i]
@@ -208,10 +280,9 @@ def simulate_tactile_feedback(shape, speed=1):
 
 # Define the categories and their items
 categories = {
-    'numbers': ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'],
-    'shapes': ['square', 'rectangle', 'cross'],
-    'letters': ['c', 'e', 'j', 'l', 'm', 'n', 'u', 'p'],
-    'beta': ['arrow', 'diamond', 'hexagon', 'kite', 'octagon', 'parallelogram', 'pentagon', 'trapezoid', 'triangle', 'star', 'r', 'v', 'w', 'z']
+    'numbers': ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+    'letters': ['a', 'b', 'c', 'd', 'e', 'f', 'h', 'i', 'j', 'l', 'p', 'q', 'u'],
+    'beta': ['k', 'm', 'n', 'r', 'v', 'w', 'y', 'z']
 }
 
 # Shuffle the items within each category for each participant
@@ -241,9 +312,9 @@ for category, items in categories.items():
                 timer_option=BeltVibrationTimerOption.RESET_TIMER,
                 exclusive_channel=False,
                 clear_other_channels=False)
-        time.sleep(4)  # Pause after each shape
+        time.sleep(5)  # Pause after each shape
 
         # Add a 5-second rest after every 5 items within the category
-        if (index + 1) % 5 == 0:
-            print("5-second rest \n")
-            time.sleep(5)
+        #if (index + 1) % 5 == 0:
+        #    print("5-second rest \n")
+        #    time.sleep(5)
