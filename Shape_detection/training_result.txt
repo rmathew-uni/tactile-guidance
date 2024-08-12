@@ -1,0 +1,3 @@
+Selected intensity after training: 5
+Block accuracy: [25.0, 6.25, 6.25]
+Training completed with an average accuracy of 12.50%
