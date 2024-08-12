@@ -88,6 +88,16 @@ def calibrate_intensity():
     # to be implemented
     return 50
 
+def get_bb_bounds(BB):
+
+    BB_x, BB_y, BB_w, BB_h = BB[:4]
+
+    BB_right = BB_x + BB_w//2
+    BB_left = BB_x - BB_w//2
+    BB_top = BB_y - BB_h//2
+    BB_bottom = BB_y + BB_h//2
+
+    return BB_right, BB_left, BB_top, BB_bottom
 
 def get_intensity(handBB, targetBB, max_intensity, depth_img):
 
@@ -120,7 +130,12 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
     # If there is an anything between hand and target that can be hit (depth smaller than depth of both target and image) - move backwards
 
-    roi_x_min, roi_x_max, roi_y_min, roi_y_max = int(min(xc_target, xc_hand)), int(max(xc_target, xc_hand)), int(min(yc_target, yc_hand)), int(max(yc_target, yc_hand))
+    hand_right, hand_left, hand_top, hand_bottom = get_bb_bounds(handBB)
+    target_right, target_left, target_top, target_bottom = get_bb_bounds(targetBB)
+
+    roi_x_min, roi_x_max, roi_y_min, roi_y_max = int(min(hand_right, target_right)), int(max(hand_left, target_left)), int(min(hand_top, target_top)), int(max(hand_bottom, target_bottom))
+
+    #roi_x_min, roi_x_max, roi_y_min, roi_y_max = int(min(xc_target, xc_hand)), int(max(xc_target, xc_hand)), int(min(yc_target, yc_hand)), int(max(yc_target, yc_hand))
 
     roi = depth_img[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
     try:
@@ -164,7 +179,6 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
             depth_intensity = 0 # placeholder
     
     return int(right_intensity), int(left_intensity), int(top_intensity), int(bottom_intensity), depth_intensity
-
 
 def check_overlap(handBB, targetBB, frozen_x, frozen_y, freezed_width, freezed_height, freezed=False):
 
