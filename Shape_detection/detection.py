@@ -8,7 +8,6 @@ from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltOrientationType,
                                     BeltVibrationTimerOption, BeltVibrationPattern)
 from bracelet import connect_belt
-from pybelt.belt_scanner import BeltScanner
 
 # Connect to the belt
 connection_check, belt_controller = connect_belt()
@@ -17,77 +16,6 @@ if connection_check:
 else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
-
-def interactive_belt_connect(belt_controller):
-    """Interactive procedure to connect a belt. The interface to use is asked via the console.
-
-    :param BeltController belt_controller: The belt controller to connect.
-    """
-
-    # Ask for the interface
-    #interface = input("Connect via Bluetooth or USB? [b,u]")
-    #interface = ""
-    #print("Connect via Bluetooth or USB? [b,u]", end="")
-    #while interface == "":
-    #    interface = input()
-    interface = 'u'
-    if interface.lower() == "b":
-        # Scan for advertising belt
-        with pybelt.belt_scanner.create() as scanner:
-            print("Start BLE scan.")
-            belts = scanner.scan()
-            print("BLE scan completed.")
-        if len(belts) == 0:
-            print("No belt found.")
-            return belt_controller
-        if len(belts) > 1:
-            print("Select the belt to connect.")
-            for i, belt in enumerate(belts):
-                print("{}. {} - {}".format((i + 1), belt.name, belt.address))
-            belt_selection = input("[1-{}]".format(len(belts)))
-            try:
-                belt_selection_int = int(belt_selection)
-            except ValueError:
-                print("Unrecognized input.")
-                return belt_controller
-            print("Connect the belt.")
-            belt_controller.connect(belts[belt_selection_int - 1])
-        else:
-            print("Connect the belt.")
-            belt_controller.connect(belts[0])
-
-    elif interface.lower() == "u":
-        # List serial COM ports
-        ports = serial.tools.list_ports.comports()
-        if ports is None or len(ports) == 0:
-            print("No serial port found.")
-            return belt_controller
-        if len(ports) == 1:
-            connect_ack = 'y'
-            if connect_ack.lower() == "y" or connect_ack.lower() == "yes":
-                print("Connect the belt.")
-                belt_controller.connect(ports[0][0])
-            else:
-                print("Unrecognized input.")
-                return belt_controller
-        else:
-            print("Select the serial COM port to use.")
-            for i, port in enumerate(ports):
-                print("{}. {}".format((i + 1), port[0]))
-            belt_selection = input("[1-{}]".format(len(ports)))
-            try:
-                belt_selection_int = int(belt_selection)
-            except ValueError:
-                print("Unrecognized input.")
-                return belt_controller
-            print("Connect the belt.")
-            belt_controller.connect(ports[belt_selection_int - 1][0])
-
-    else:
-        print("Unrecognized input.")
-        return belt_controller
-
-    return belt_controller
 
 # Define shapes with vertices
 shapes = {
@@ -147,7 +75,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'right', time_required
     elif dx < 0 and dy == 0:
         if belt_controller:
@@ -163,7 +90,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'left', time_required
     elif dy > 0 and dx == 0:
         if belt_controller:
@@ -179,7 +105,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )     
-            belt_controller.stop_vibration()
             return 'top', time_required
     elif dy < 0 and dx == 0:
         if belt_controller:
@@ -195,7 +120,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'down', time_required
     elif dx > 0 and dy > 0:
         if belt_controller:
@@ -211,7 +135,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'diagonal right top', time_required
     elif dx > 0 and dy < 0:
         if belt_controller:
@@ -227,7 +150,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'diagonal right bottom', time_required
     elif dx < 0 and dy > 0:
         if belt_controller:
@@ -243,7 +165,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'diagonal left top', time_required
     elif dx < 0 and dy < 0:
         if belt_controller:
@@ -259,7 +180,6 @@ def calculate_direction_and_time(start, end, speed=1):
             exclusive_channel=False,
             clear_other_channels=False
             )
-            belt_controller.stop_vibration()
             return 'diagonal left bottom', time_required
     else:
         return 'none', 0
@@ -276,7 +196,10 @@ def simulate_tactile_feedback(shape, speed=1):
         direction, time_required = calculate_direction_and_time(start, end, speed)
         if direction != 'none':
             print(f"{direction} for {time_required:.2f} seconds")
-            time.sleep(time_required)  # Simulate the time required for the movement
+            time.sleep(time_required) # Simulate the time required for the movement
+            belt_controller.stop_vibration()
+            time.sleep(1)
+
 
 # Define the categories and their items
 categories = {
@@ -291,7 +214,7 @@ for category, items in categories.items():
 
 # Execute drawing tasks for each category sequentially
 for category, items in categories.items():
-    print(f"Starting category: {category}")
+    print(f"Starting category: {category}\n")
     for index, item in enumerate(items):
         time.sleep(3)
         print(item)
