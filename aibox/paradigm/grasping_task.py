@@ -119,7 +119,10 @@ class GraspingTaskController(controller.BraceletController):
         #thread = threading.Thread(target=self.change_target)
         #thread.daemon = True
         #thread.start()
-        self.ready_for_next_trial = False
+        self.ready_for_next_trial = True
+        self.target_entered = True # counter intuitive, but setting as True to wait for press of "s" button to start first trial
+        self.class_target_obj = -1 # placeholder value not assigned to any specific object
+        trial_start_time = -1 # placeholder initial value
 
         # Data processing: Iterate over each frame of the live stream
         for frame, (path, im, im0s, vid_cap, _) in enumerate(self.dataset):
@@ -362,7 +365,7 @@ class GraspingTaskController(controller.BraceletController):
                 '''
 
             # Save results
-            '''if save_img:
+            if save_img:
                 if self.dataset.mode == 'image':
                     cv2.imwrite(save_path, im0)
                 else:  # 'video' or 'stream'
@@ -379,7 +382,7 @@ class GraspingTaskController(controller.BraceletController):
                         save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                         vid_writer[0] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer[0].write(im0)
-            '''
+            
         # endregion
 
 # endregion
@@ -403,7 +406,7 @@ if __name__ == '__main__':
 
     # EXPERIMENT CONTROLS
 
-    target_objs = ['cup', 'bowl', 'cup', 'bowl']
+    target_objs = ['cup', 'bottle', 'cup', 'apple']
 
     participant = 1
     output_path = str(parent_dir) + '/results/'
@@ -444,7 +447,7 @@ if __name__ == '__main__':
                         conf_thres=0.7,  # confidence threshold
                         save_conf=False,  # save confidences in --save-txt labels
                         save_crop=False,  # save cropped prediction boxes
-                        nosave=True,  # do not save images/videos
+                        nosave=False,  # do not save images/videos
                         classes_obj=[1,39,40,41,45,46,47,58,74],  # filter by class /  check coco.yaml file or coco_labels variable in this script
                         classes_hand=[0,1], 
                         class_hand_nav=[80,81],
