@@ -239,8 +239,7 @@ class GraspingTaskController(controller.BraceletController):
                     print('High change between frames. Resetting predictions.')
                     outputs = []
                 #cv2.imshow('Diff',diff)
-                #cv2.waitKey(0)    
-
+                #cv2.waitKey(0)
 
             # Depth estimation (automatically skips revived bbs)
             depth_img, outputs = controller.get_depth(im0, self.transform, self.device, self.model, self.depth_estimator, self.net_w, self.net_h, vis=False, bbs=outputs)
@@ -282,7 +281,6 @@ class GraspingTaskController(controller.BraceletController):
                     file = f'resources/sound/{target_obj_verb}.mp3'
                     self.output_data.append(self.class_target_obj)
                     #playsound(str(file))
-                    # Start trial time measure (end in navigate_hand(...))
 
                 self.target_entered = True
                 trial_start_time = time.time()
@@ -290,13 +288,6 @@ class GraspingTaskController(controller.BraceletController):
 
             # Navigate the hand based on information from last frame and current frame detections
             grasped, curr_target = navigate_hand(self.belt_controller, outputs, self.class_target_obj, self.class_hand_nav, depth_img)
-        
-            # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
-            if grasped:
-                pass
-                #if self.manual_entry and ((self.obj_index+1)<=len(self.target_objs)):
-                #    self.obj_index += 1
-                #self.target_entered = False
 
         # region visualization
             # Write results
@@ -319,12 +310,9 @@ class GraspingTaskController(controller.BraceletController):
             # Display results
             im0 = annotator.result()
             if self.view_img:
-                #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
                 cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
-                #cv2.imshow("AIBox", im0) # original image only
                 side_by_side = create_side_by_side(im0, depth_img, False) # original image & depth side-by-side
                 cv2.imshow("AIBox & Depth", side_by_side)
-                #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
 
                 pressed_key = cv2.waitKey(1)
 
@@ -336,31 +324,6 @@ class GraspingTaskController(controller.BraceletController):
                     bracelet_controller.print_output_data()
                     bracelet_controller.save_output_data()
                     break
-
-                '''
-                # end trial
-                if pressed_key in [ord('y'), ord('n')] and not ready_for_next_trial:
-                    trial_end_time = time.time()
-                    print(f'Trial time: {trial_end_time - trial_start_time}')
-                    if self.obj_index >= len(self.target_objs) - 1:
-                        print("ALL TARGETS COVERED")
-                        break
-                    else:
-                        if pressed_key == ord('y'):
-                            print("TRIAL SUCCESSFUL")
-                        elif pressed_key == ord('n'):
-                            print("TRIAL FAILED")
-                        print("MOVING TO NEXT TARGET")
-                        self.obj_index += 1
-                        ready_for_next_trial = True
-                # start next trial
-                elif pressed_key == ord('s') and ready_for_next_trial:
-                    self.target_entered = False
-                    ready_for_next_trial = False
-                # end experiment
-                elif pressed_key == ord('q'):
-                    break
-                '''
 
             # Save results
             if save_img:
