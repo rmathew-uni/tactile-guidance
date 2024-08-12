@@ -292,8 +292,8 @@ def training_task():
         block_directions = directions * 2
         random.shuffle(block_directions)
 
-        for direction in range(block_directions):
-            print(f"Trial {block * trials_per_block + trial + 1}: Vibration direction is {direction}.")
+        for direction in block_directions[:trials_per_block]:
+            print(f"Trial: Vibration direction is {direction}.")
             vibrate_direction(direction)
             start_time = time.time()
             user_response = capture_direction()
@@ -337,30 +337,39 @@ def training_task():
     average_accuracy = np.mean(block_accuracies)
     print(f"Selected intensity after training: {calibrated_intensity}")
     print(f"Block accuracy: {block_accuracies}")
-    print(f"Training completed with an average accuracy of {average_accuracy:.2f}%")
-
-    # Save result to Excel file
-    results_df = pd.DataFrame({
-        'Actual Direction': actual_directions,
-        'Predicted Direction': predicted_directions,
-        'Response Time (s)': response_times
-    })
-    results_df.to_excel('training_results.xlsx', index = False)
-    print('\nResults saved to training_results.xlsx')
 
     # Determine if the training accuracy is sufficient
     if average_accuracy >= 90:
         print(f"Training completed with an accuracy of {average_accuracy:.2f}%")
     else: 
         print(f"Training accuracy below 90% with an accuracy of {average_accuracy:.2f}%")
-        sys.exit()
 
-    return average_accuracy, block_accuracies, actual_directions, predicted_directions
+
+    # Save result to .txt file
+    file_path = r"C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.txt"
+    with open(file_path, 'w') as file:  
+        file.write(f"Selected intensity after training: {calibrated_intensity}\n")
+        file.write(f"Block accuracy: {block_accuracies}\n")
+        file.write(f"Training completed with an average accuracy of {average_accuracy:.2f}%\n")
+    print('\nResults saved to training_result.txt')
+
+    # Excel output
+    result = {'Actual Direction': actual_directions,
+         'Predicted Direction': predicted_directions,
+         'Response Time (s)': response_times}
+    df = pd.DataFrame(data=result)
+    df.to_excel("C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx")
+
+    return
+    #return average_accuracy, block_accuracies, actual_directions, predicted_directions
 
 
 # Run familiarization phase
-familiarization_phase()
+#familiarization_phase()
 
 # Run training task
-training_accuracy = training_task()
+#training_accuracy = training_task()
+training_task()
 
+belt_controller.disconnect_belt() if belt_controller else None
+sys.exit()
