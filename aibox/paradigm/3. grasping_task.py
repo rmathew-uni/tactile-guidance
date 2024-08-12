@@ -115,10 +115,6 @@ class GraspingTaskController(controller.BraceletController):
         outputs = []
         prev_outputs = np.array([])
 
-        # Start threading to check for target change command
-        #thread = threading.Thread(target=self.change_target)
-        #thread.daemon = True
-        #thread.start()
         self.ready_for_next_trial = True
         self.target_entered = True # counter intuitive, but setting as True to wait for press of "s" button to start first trial
         self.class_target_obj = -1 # placeholder value not assigned to any specific object
@@ -337,6 +333,8 @@ class GraspingTaskController(controller.BraceletController):
                 trial_info = self.experiment_trial_logic(trial_start_time, trial_end_time, pressed_key)
                 
                 if trial_info == "break":
+                    bracelet_controller.print_output_data()
+                    bracelet_controller.save_output_data()
                     break
 
                 '''
@@ -399,7 +397,7 @@ if __name__ == '__main__':
     depth_estimator = 'midas_v21_small_256' # depth estimator model type (weights are loaded automatically!), 
                                       # e.g.'midas_v21_small_256', ('dpt_levit_224', 'dpt_swin2_tiny_256',) 'dpt_large_384'
     source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
-    mock_navigate = True # Navigate without the bracelet using only print commands
+    mock_navigate = False # Navigate without the bracelet using only print commands
     belt_controller = None
     run_object_tracker = True
     run_depth_estimator = True
@@ -477,10 +475,6 @@ if __name__ == '__main__':
                         participant=participant) # debugging
         
         bracelet_controller.run()
-
-        bracelet_controller.print_output_data()
-
-        bracelet_controller.save_output_data()
 
     except KeyboardInterrupt:
         controller.close_app(belt_controller)
