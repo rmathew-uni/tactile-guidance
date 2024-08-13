@@ -19,6 +19,9 @@ sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
 sys.path.append(str(root) + '/MiDaS')
 
+# Image processing
+import cv2
+
 # Object tracking
 import torch
 from labels import coco_labels # COCO labels dictionary
@@ -179,7 +182,7 @@ class BraceletController(AutoAssign):
                 max_dist=0.5,          # The matching threshold. Samples with larger distance are considered an invalid match
                 max_iou_distance=0.7,  # Gating threshold. Associations with cost larger than this value are disregarded.
                 max_age=max_age,       # Maximum number of missed misses (prediction calls, i.e. frames) before a track is deleted
-                n_init=n_init,              # Number of frames that a track remains in initialization phase --> if 0, track is confirmed on first detection
+                n_init=n_init,         # Number of frames that a track remains in initialization phase --> if 0, track is confirmed on first detection
                 nn_budget=100,         # Maximum size of the appearance descriptors gallery
                 mc_lambda=0.995,       # matching with both appearance (1 - MC_LAMBDA) and motion cost
                 ema_alpha=0.9          # updates  appearance  state in  an exponential moving average manner
@@ -334,7 +337,21 @@ class BraceletController(AutoAssign):
                 outputs = np.array(preds)
                 outputs = np.insert(outputs, 4, -1, axis=1) # insert track_id placeholder
                 outputs[:, [5, 6]] = outputs[:, [6, 5]] # switch cls and conf columns for alignment with tracker
-            
+
+            # Calculate difference between current and previous frame
+            if prev_frames is not None:
+                img_gr_1, img_gr_2 = cv2.cvtColor(curr_frames, cv2.COLOR_BGR2GRAY), cv2.cvtColor(prev_frames, cv2.COLOR_BGR2GRAY)
+                diff = cv2.absdiff(img_gr_1, img_gr_2)
+                mean_diff = np.mean(diff)
+                std_diff = np.std(diff)
+                print(f'Frames mean difference: {mean_diff}, SD: {std_diff}')
+                if mean_diff > 30: # Big change between frames
+                    print('High change between frames. Resetting predictions.')
+                    outputs = []
+                #cv2.imshow('Diff',diff)
+                #cv2.waitKey(0)    
+
+
             # Depth estimation (automatically skips revived bbs)
             depth_img, outputs = get_depth(im0, self.transform, self.device, self.model, self.depth_estimator, self.net_w, self.net_h, vis=False, bbs=outputs)
 
@@ -347,46 +364,6 @@ class BraceletController(AutoAssign):
             fps = 1 / runtime
             fpss.append(fps)
             prev_frames = curr_frames
-
-        # region visualization
-            # Write results
-            for *xywh, obj_id, cls, conf, depth in outputs:
-                id, cls = int(obj_id), int(cls)
-                xyxy = xywh2xyxy(np.array(xywh))
-                if save_img or self.save_crop or self.view_img:
-                    label = None if self.hide_labels else (f'ID: {id} {self.master_label[cls]}' if self.hide_conf else (f'ID: {id} {self.master_label[cls]} {conf:.2f} {depth:.2f}'))
-                    annotator.box_label(xyxy, label, color=colors(cls, True))
-
-            # Display results
-            im0 = annotator.result()
-            if self.view_img:
-                #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
-                cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
-                #cv2.imshow("AIBox", im0) # original image only
-                side_by_side = create_side_by_side(im0, depth_img, False) # original image & depth side-by-side
-                cv2.imshow("AIBox & Depth", side_by_side)
-                #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-            # Save results
-            if save_img:
-                if self.dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
-                else:  # 'video' or 'stream'
-                    if vid_path[0] != save_path:  # new video
-                        vid_path[0] = save_path
-                        if isinstance(vid_writer[0], cv2.VideoWriter):
-                            vid_writer[0].release()  # release previous video writer
-                        if vid_cap:  # video
-                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
-                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                        else:  # stream
-                            fps, w, h = 30, im0.shape[1], im0.shape[0]
-                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
-                        vid_writer[0] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
-                    vid_writer[0].write(im0)
             
         # endregion
 
@@ -419,13 +396,62 @@ class BraceletController(AutoAssign):
                 self.target_entered = True
 
             # Navigate the hand based on information from last frame and current frame detections
-            grasped = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav)
+            grasped, curr_target = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav, depth_img)
         
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasped:
                 if self.manual_entry and ((self.obj_index+1)<=len(self.target_objs)):
                     self.obj_index += 1
                 self.target_entered = False
+
+        # region visualization
+            # Write results
+            for *xywh, obj_id, cls, conf, depth in outputs:
+                id, cls = int(obj_id), int(cls)
+                xyxy = xywh2xyxy(np.array(xywh))
+                if save_img or self.save_crop or self.view_img:
+                    label = None if self.hide_labels else (f'ID: {id} {self.master_label[cls]}' if self.hide_conf else (f'ID: {id} {self.master_label[cls]} {conf:.2f} {depth:.2f}'))
+                    annotator.box_label(xyxy, label, color=colors(cls, True))
+
+            # Target BB
+            if curr_target is not None:
+                print(curr_target)
+                for *xywh, obj_id, cls, conf, depth in [curr_target]:
+                    xyxy = xywh2xyxy(np.array(xywh))
+                    if save_img or self.save_crop or self.view_img:
+                        label = None if self.hide_labels else 'Target object'
+                        annotator.box_label(xyxy, label, color=(0,0,0))
+
+            # Display results
+            im0 = annotator.result()
+            if self.view_img:
+                #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
+                cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
+                #cv2.imshow("AIBox", im0) # original image only
+                side_by_side = create_side_by_side(im0, depth_img, False) # original image & depth side-by-side
+                cv2.imshow("AIBox & Depth", side_by_side)
+                #cv2.resizeWindow("AIBox", im0.shape[1]//2, im0.shape[0]//2) # for resizing
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+            # Save results
+            if save_img:
+                if self.dataset.mode == 'image':
+                    cv2.imwrite(save_path, im0)
+                else:  # 'video' or 'stream'
+                    if vid_path[0] != save_path:  # new video
+                        vid_path[0] = save_path
+                        if isinstance(vid_writer[0], cv2.VideoWriter):
+                            vid_writer[0].release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer[0] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer[0].write(im0)
 
         # endregion
 
@@ -487,7 +513,7 @@ class BraceletController(AutoAssign):
 
         # Load tracker model
         if self.run_object_tracker:
-            self.load_object_tracker(max_age=10, n_init=10) # the max_age of a track should depend on the average fps of the program (i.e. should be measured in time, not frames)
+            self.load_object_tracker(max_age=self.tracker_max_age, n_init=self.tracker_n_init) # the max_age of a track should depend on the average fps of the program (i.e. should be measured in time, not frames)
         else:
             print('SKIPPING OBJECT TRACKER INITIALIZATION')
 
