@@ -280,9 +280,8 @@ def training_task():
     blocks = 3
     trials_per_block = 16
     block_accuracies = []
-    actual_directions =[]
-    predicted_directions = []
-    response_times = []
+
+    block_results = {}
 
     for block in range(blocks):
         correct_responses = 0
@@ -292,8 +291,13 @@ def training_task():
         block_directions = directions * 2
         random.shuffle(block_directions)
 
-        for direction in block_directions[:trials_per_block]:
-            print(f"Trial: Vibration direction is {direction}.")
+        actual_directions =[]
+        predicted_directions = []
+        response_times = []
+        trial_numbers = []
+
+        for trial_num, direction in enumerate(block_directions[:trials_per_block], start = 1):
+            print(f"Trial {trial_num}: Vibration direction is {direction}.")
             vibrate_direction(direction)
             start_time = time.time()
             user_response = capture_direction()
@@ -303,12 +307,22 @@ def training_task():
             print(f"User response: {user_response}")
             belt_controller.stop_vibration()
             time.sleep(1)
+
+            trial_numbers.append(trial_num)
             actual_directions.append(direction)
             predicted_directions.append(user_response)
             response_times.append(response_time)
 
             if user_response == direction:
                 correct_responses += 1
+
+            # Store the results for the current block
+            block_results[f'Block {block + 1}'] = {
+                'Trial': trial_numbers,
+                'Actual Direction': actual_directions, 
+                'Predicted Direction': predicted_directions,
+                'Response Time (s)': response_times
+            }   
 
         # Stop vibration after completing a block with custom stop signal
         if belt_controller:
@@ -354,11 +368,16 @@ def training_task():
     print('\nResults saved to training_result.txt')
 
     # Excel output
-    result = {'Actual Direction': actual_directions,
-         'Predicted Direction': predicted_directions,
-         'Response Time (s)': response_times}
-    df = pd.DataFrame(data=result)
-    df.to_excel("C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx")
+    with pd.ExcelWriter('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx') as writer:
+        for block_name, data in block_results.items():
+            df = pd.DataFrame(data)
+            df.to_excel(writer, sheet_name = block_name, index=False)
+    
+    #result = {'Actual Direction': actual_directions,
+    #     'Predicted Direction': predicted_directions,
+    #     'Response Time (s)': response_times}
+    #df = pd.DataFrame(data=result)
+    #df.to_excel("C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx")
 
     return
     #return average_accuracy, block_accuracies, actual_directions, predicted_directions
