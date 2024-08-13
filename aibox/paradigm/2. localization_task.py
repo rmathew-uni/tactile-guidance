@@ -249,7 +249,7 @@ def calculate_direction_and_time(vibration_intensities, start, end, speed=1):
     else:
         return 'none', 0
     
-def simulate_tactile_feedback(vibration_intensities, shape, speed=1):
+def draw_shape(vibration_intensities, shape, speed=1):
     vertices = shapes[shape]
     vertices.append(vertices[-1])  # Add the last vertex again to complete the shape
 
@@ -274,7 +274,7 @@ def localization_task(categories, vibration_intensities):
         for index, item in enumerate(items):
             time.sleep(3)
             print(item)
-            simulate_tactile_feedback(vibration_intensities, item)
+            draw_shape(vibration_intensities, item)
             print("stop \n")
 
 
