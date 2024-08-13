@@ -88,6 +88,7 @@ def calibrate_intensity():
     # to be implemented
     return 50
 
+
 def get_bb_bounds(BB):
 
     BB_x, BB_y, BB_w, BB_h = BB[:4]
@@ -98,6 +99,7 @@ def get_bb_bounds(BB):
     BB_bottom = BB_y + BB_h//2
 
     return BB_right, BB_left, BB_top, BB_bottom
+
 
 def get_intensity(handBB, targetBB, max_intensity, depth_img):
 
@@ -137,48 +139,52 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
 
     #roi_x_min, roi_x_max, roi_y_min, roi_y_max = int(min(xc_target, xc_hand)), int(max(xc_target, xc_hand)), int(min(yc_target, yc_hand)), int(max(yc_target, yc_hand))
 
-    roi = depth_img[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
-    try:
-        max_depth = np.max(roi)
-    except ValueError:
-        max_depth = -1
+    if depth_img is not None:
+        roi = depth_img[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
+        try:
+            max_depth = np.max(roi)
+        except ValueError:
+            max_depth = -1
 
-    print(handBB[7])
-    print(targetBB[7])
-    print(max_depth)
+        print(handBB[7])
+        print(targetBB[7])
+        print(max_depth)
 
-    print(f"{xc_hand},{yc_hand},{xc_target},{yc_target}")
-    print(depth_img.shape, roi.shape)
-    if yc_hand < 480 and xc_hand > 640:
-        print(depth_img[int(yc_hand), int(xc_hand)])
+        print(f"{xc_hand},{yc_hand},{xc_target},{yc_target}")
+        print(depth_img.shape, roi.shape)
+        if yc_hand < 480 and xc_hand > 640:
+            print(depth_img[int(yc_hand), int(xc_hand)])
 
-    """xyxy = xywh2xyxy(np.array(roi))
-    label = "ROI"
-    annotator.box_label(xyxy, label)
+        """xyxy = xywh2xyxy(np.array(roi))
+        label = "ROI"
+        annotator.box_label(xyxy, label)
 
-    # Display results
-    im0 = annotator.result()
-    cv2.imshow("ROI", im0) # original image only
-    """
+        # Display results
+        im0 = annotator.result()
+        cv2.imshow("ROI", im0) # original image only
+        """
 
-    #if max_depth > handBB[7]:
-    if max_depth < handBB[7]:
-        print("object in line of movement")
-        depth_intensity = round(-max_intensity/5) * 5
+        #if max_depth > handBB[7]:
+        if max_depth < handBB[7]:
+            print("object in line of movement")
+            depth_intensity = round(-max_intensity/5) * 5
 
-    # Otherwise check if hand is closer or further than the target and set depth intensity accordingly
-    else:
-        depth_distance = handBB[7] - targetBB[7]
-        if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
-            if depth_distance > 0: #move forward
-                depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
-            elif depth_distance < 0: #move backwards
-                depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
-            depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
+        # Otherwise check if hand is closer or further than the target and set depth intensity accordingly
         else:
-            depth_intensity = 0 # placeholder
+            depth_distance = handBB[7] - targetBB[7]
+            if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
+                if depth_distance > 0: #move forward
+                    depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
+                elif depth_distance < 0: #move backwards
+                    depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
+                depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
+            else:
+                depth_intensity = 0 # placeholder
+    else:
+        depth_intensity = 0
     
     return int(right_intensity), int(left_intensity), int(top_intensity), int(bottom_intensity), depth_intensity
+
 
 def check_overlap(handBB, targetBB, frozen_x, frozen_y, freezed_width, freezed_height, freezed=False):
 

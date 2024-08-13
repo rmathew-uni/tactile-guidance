@@ -7,8 +7,6 @@ This script is using code from the following sources:
 """
 
 # region Setup
-
-# System
 import sys
 from pathlib import Path
 
@@ -19,14 +17,7 @@ sys.path.append(str(root) + '/yolov5')
 sys.path.append(str(root) + '/strongsort')
 sys.path.append(str(root) + '/MiDaS')
 
-# Navigation
 import controller
-
-# Utility
-import keyboard
-from playsound import playsound
-import threading
-
 # endregion
 
 # region Main
@@ -38,13 +29,12 @@ if __name__ == '__main__':
     weights_obj = 'yolov5s.pt'  # Object model weights path
     weights_hand = 'hand.pt' # Hands model weights path
     weights_tracker = 'osnet_x0_25_market1501.pt' # ReID weights path
-    depth_estimator = 'midas_v21_small_256' # depth estimator model type (weights are loaded automatically!), 
-                                      # e.g.'midas_v21_small_256', ('dpt_levit_224', 'dpt_swin2_tiny_256',) 'dpt_large_384'
+    weights_depth_estimator = 'v2-vits14' # v2-vits14, v1-cnvnxtl
     source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
     run_object_tracker = True
-    run_depth_estimator = True
+    run_depth_estimator = False
 
     print(f'\nLOADING CAMERA AND BRACELET')
 
@@ -66,11 +56,11 @@ if __name__ == '__main__':
             sys.exit()
 
     try:
-        bracelet_controller = controller.BraceletController(weights_obj=weights_obj,  # model_obj path or triton URL # ROOT
-                        weights_hand=weights_hand,  # model_obj path or triton URL # ROOT
-                        weights_tracker=weights_tracker, # ROOT
-                        depth_estimator=depth_estimator,
-                        source=source,  # file/dir/URL/glob/screen/0(webcam) # ROOT
+        bracelet_controller = controller.BraceletController(weights_obj=weights_obj,  # model_obj path or triton URL 
+                        weights_hand=weights_hand,  # model_obj path or triton URL 
+                        weights_tracker=weights_tracker,
+                        weights_depth_estimator=weights_depth_estimator,
+                        source=source,  # file/dir/URL/glob/screen/0(webcam)
                         iou_thres=0.45,  # NMS IOU threshold
                         max_det=1000,  # maximum detections per image
                         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
@@ -88,7 +78,7 @@ if __name__ == '__main__':
                         augment=False,  # augmented inference
                         visualize=False,  # visualize features
                         update=False,  # update all models
-                        project='runs/detect',  # save results to project/name # ROOT
+                        project='runs/detect',  # save results to project/name 
                         name='video',  # save results to project/name
                         exist_ok=False,  # existing project/name ok, do not increment
                         line_thickness=3,  # bounding box thickness (pixels)
@@ -104,7 +94,7 @@ if __name__ == '__main__':
                         belt_controller=belt_controller,
                         tracker_max_age=10,
                         tracker_n_init=5,
-                        target_objs = ['bottle' for _ in range(5)]) # debugging
+                        target_objs = ['potted plant' for _ in range(5)]) # debugging
         
         bracelet_controller.run()
 
