@@ -40,12 +40,12 @@ def load_images(path, targets):
 
 if __name__ == '__main__':
     # Load EMNIST training dataset
-    test_images, test_labels = extract_test_samples('digits')
+    #test_images, test_labels = extract_test_samples('digits')
 
     #image_path = 'D:/WWU/M8 - Master Thesis/Project/Code/Images/four.jpg' 
     image_path = 'D:/WWU/M8 - Master Thesis/Project/Code/Images/'
-    targets = ['zero', 'one', 'two', 'three', 'four']
-    test_labels = [0, 1, 2, 3, 4]
+    targets = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
+    test_labels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
     test_images, test_labels = load_images(image_path, targets), int_labels_to_emnist_format(test_labels)
 
     #test_images = torch.tensor((test_images/255-0.5).reshape(40000, 1, 28, 28))
