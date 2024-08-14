@@ -156,7 +156,7 @@ class BraceletController(AutoAssign):
 
         self.depth_estimator = UniDepthEstimator(
             model_type = self.weights_depth_estimator, # v2-vits14, v1-cnvnxtl
-            device=self.device # cpu, cuda, mps
+            device=self.device
         )
 
         print(f'\nDEPTH ESTIMATOR LOADED SUCCESFULLY')
@@ -188,6 +188,8 @@ class BraceletController(AutoAssign):
 
         # Data processing: Iterate over each frame of the live stream
         for frame, (path, im, im0s, vid_cap, _) in enumerate(self.dataset):
+
+            print(f'Frame {frame+1}')
 
             # Start timer for FPS measure
             start = time.perf_counter()
@@ -310,10 +312,10 @@ class BraceletController(AutoAssign):
 
             # Depth estimation (automatically skips revived bbs)
             if self.run_depth_estimator:
-                depth, _ = self.depth_estimator.predict_depth(im0)
-                outputs = bbs_to_depth(im0, depth, outputs)
+                depthmap, _ = self.depth_estimator.predict_depth(im0)
+                outputs = bbs_to_depth(im0, depthmap, outputs)
             else:
-                depth = None
+                depthmap = None
 
             # Set current tracking information as previous info
             prev_outputs = np.array(outputs)
@@ -356,7 +358,7 @@ class BraceletController(AutoAssign):
                 self.target_entered = True
 
             # Navigate the hand based on information from last frame and current frame detections
-            grasped, curr_target = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav, depth)
+            grasped, curr_target = navigate_hand(self.belt_controller, outputs, class_target_obj, self.class_hand_nav, depthmap)
         
             # Exit the loop if hand and object aligned horizontally and vertically and grasp signal was sent
             if grasped:
@@ -388,7 +390,7 @@ class BraceletController(AutoAssign):
                 #cv2.namedWindow("AIBox", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO) # for resizing
                 cv2.putText(im0, f'FPS: {int(fps)}, Avg: {int(np.mean(fpss))}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0,255,0), 1)
                 if self.run_depth_estimator:
-                    side_by_side = self.depth_estimator.create_depthmap(im0, depth, False) # original image & depth side-by-side
+                    side_by_side = self.depth_estimator.create_depthmap(im0, depthmap, False) # original image & depth side-by-side
                     cv2.imshow("AIBox & Depthmap", side_by_side)
                 else:
                     cv2.imshow("AIBox", im0) # original image only
@@ -488,7 +490,8 @@ class BraceletController(AutoAssign):
         # Warmup models
         self.warmup_model(self.model_obj)
         self.warmup_model(self.model_hand)
-        self.warmup_model(self.tracker.model,'tracker')
+        if self.run_object_tracker:
+            self.warmup_model(self.tracker.model,'tracker')
 
         # Start experiment loop
         self.experiment_loop(save_dir, save_img, index_add, vid_path, vid_writer)

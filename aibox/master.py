@@ -33,8 +33,8 @@ if __name__ == '__main__':
     source = '1' # image/video path or camera source (0 = webcam, 1 = external, ...)
     mock_navigate = True # Navigate without the bracelet using only print commands
     belt_controller = None
-    run_object_tracker = True
-    run_depth_estimator = False
+    run_object_tracker = False
+    run_depth_estimator = True
 
     print(f'\nLOADING CAMERA AND BRACELET')
 
@@ -94,7 +94,7 @@ if __name__ == '__main__':
                         belt_controller=belt_controller,
                         tracker_max_age=10,
                         tracker_n_init=5,
-                        target_objs = ['potted plant' for _ in range(5)]) # debugging
+                        target_objs = ['bottle' for _ in range(5)]) # debugging
         
         bracelet_controller.run()
 

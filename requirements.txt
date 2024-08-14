@@ -1,24 +1,26 @@
 # Python v3.11.5 required
 numpy==1.26.4
 playsound
-PyObjC # for playsound with python3
 opencv-python
-torch==2.2.0 # latest 2.4.0 throws "segmentation fault"
-torchvision==0.17.0
 pandas
 requests
 pillow
 torchreid
 gdown
 tensorboard
-open3d # requires 3.8 <= Python <= 3.11
 einops
 huggingface-hub
+open3d
 timm
 wandb
-xformers
 pybelt
 pynput
-
-# xformers warning or "segmentation fault" --> reinstall torch:
-#conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=12.1 -c pytorch -c nvidia
+# Guide to finding compatibility between cuda (nvcc -V), pytorch and xformers: https://www.felixsanz.dev/articles/compatibility-between-pytorch-cuda-and-xformers-versions
+--index-url https://download.pytorch.org/whl/cu118
+torch==2.2.0
+--index-url https://download.pytorch.org/whl/cu118
+torchvision==0.17.0
+--index-url https://download.pytorch.org/whl/cu118
+torchaudio==2.2.0
+--index-url https://download.pytorch.org/whl/cu118
+xformers

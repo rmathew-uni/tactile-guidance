@@ -61,12 +61,15 @@ class UniDepthEstimator:
         self.model = self.load_model()
     
     def get_device(self, device):
-        if device in ['cpu', 'cuda', 'mps']:
-            if device == 'cuda' and torch.cuda.is_available():
-                return torch.device("cuda")
-            if device == 'mps' and torch.backends.mps.is_available():
-                return torch.device("mps")
-        return torch.device("cpu")
+        if torch.cuda.is_available():
+            print('Loaded DE with cuda')
+            return torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            print('Loaded DE with mps')
+            return torch.device("mps")
+        else:
+            print('Loaded DE with cpu')
+            return torch.device("cpu")
     
     def load_model(self):
         if 'v1' in self.model_type:
@@ -88,7 +91,6 @@ class UniDepthEstimator:
     
     def predict_depth(self, image):
         self.model.eval()
-        print(f'Device: {self.device}')
         input = self.preprocess(image)
         with torch.no_grad():
             start = time.time()
