@@ -103,21 +103,21 @@ def get_intensity(handBB, targetBB, vibration_intensities, depth_img):
     top_intensity = 0
     bottom_intensity = 0
 
-    bottom_intensity, top_intensity, left_intensity, right_intensity = vibration_intensities["bottom"], vibration_intensities["top"], vibration_intensities["left"], vibration_intensities["right"]
+    max_bottom_intensity, max_top_intensity, max_left_intensity, max_right_intensity = vibration_intensities["bottom"], vibration_intensities["top"], vibration_intensities["left"], vibration_intensities["right"]
 
     # Calculate motor intensities based on the angle
     if 0 <= angle < 90:
-        right_intensity = (90 - angle) / 90 * right_intensity
-        top_intensity = angle / 90 * top_intensity
+        right_intensity = (90 - angle) / 90 * max_right_intensity
+        top_intensity = angle / 90 * max_top_intensity
     elif 90 <= angle < 180:
-        top_intensity = (180 - angle) / 90 * top_intensity
-        left_intensity = (angle - 90) / 90 * left_intensity
+        top_intensity = (180 - angle) / 90 * max_top_intensity
+        left_intensity = (angle - 90) / 90 * max_left_intensity
     elif 180 <= angle < 270:
-        left_intensity = (270 - angle) / 90 * left_intensity
-        bottom_intensity = (angle - 180) / 90 * bottom_intensity
+        left_intensity = (270 - angle) / 90 * max_left_intensity
+        bottom_intensity = (angle - 180) / 90 * max_bottom_intensity
     elif 270 <= angle < 360:
-        bottom_intensity = (360 - angle) / 90 * bottom_intensity
-        right_intensity = (angle - 270) / 90 * right_intensity
+        bottom_intensity = (360 - angle) / 90 * max_bottom_intensity
+        right_intensity = (angle - 270) / 90 * max_right_intensity
 
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
     # If there is an anything between hand and target that can be hit (depth smaller than depth of both target and image) - move backwards
