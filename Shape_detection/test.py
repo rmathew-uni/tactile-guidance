@@ -11,7 +11,13 @@ def test(cnn):
     with torch.no_grad():
         correct = 0
         for images, labels in test_loader:
-            #images, labels = images.cuda(), labels.cuda()        
+            #images, labels = images.cuda(), labels.cuda()    
+            for i in range(len(images)):
+                plt.subplot(5, 8, i + 1)
+                plt.imshow((images[i].numpy().transpose([1, 2, 0])+1)/2)
+                plt.xticks([])
+                plt.yticks([])
+            plt.show()       
             test_output = cnn.forward(images)
             pred_y = torch.max(test_output, 1)[1]
             print(f"Prediction: {pred_y}, label: {labels}")
