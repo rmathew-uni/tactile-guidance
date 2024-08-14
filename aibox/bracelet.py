@@ -89,7 +89,7 @@ def calibrate_intensity():
     return 50
 
 
-def get_intensity(handBB, targetBB, max_intensity, depth_img):
+def get_intensity(handBB, targetBB, vibration_intensities, depth_img):
 
     # calculate angle
     xc_hand, yc_hand = handBB[:2]
@@ -103,19 +103,21 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     top_intensity = 0
     bottom_intensity = 0
 
+    bottom_intensity, top_intensity, left_intensity, right_intensity = vibration_intensities["bottom"], vibration_intensities["top"], vibration_intensities["left"], vibration_intensities["right"]
+
     # Calculate motor intensities based on the angle
     if 0 <= angle < 90:
-        right_intensity = (90 - angle) / 90 * max_intensity
-        top_intensity = angle / 90 * max_intensity
+        right_intensity = (90 - angle) / 90 * right_intensity
+        top_intensity = angle / 90 * top_intensity
     elif 90 <= angle < 180:
-        top_intensity = (180 - angle) / 90 * max_intensity
-        left_intensity = (angle - 90) / 90 * max_intensity
+        top_intensity = (180 - angle) / 90 * top_intensity
+        left_intensity = (angle - 90) / 90 * left_intensity
     elif 180 <= angle < 270:
-        left_intensity = (270 - angle) / 90 * max_intensity
-        bottom_intensity = (angle - 180) / 90 * max_intensity
+        left_intensity = (270 - angle) / 90 * left_intensity
+        bottom_intensity = (angle - 180) / 90 * bottom_intensity
     elif 270 <= angle < 360:
-        bottom_intensity = (360 - angle) / 90 * max_intensity
-        right_intensity = (angle - 270) / 90 * max_intensity
+        bottom_intensity = (360 - angle) / 90 * bottom_intensity
+        right_intensity = (angle - 270) / 90 * right_intensity
 
     # front / back motor (depth), currently it is used for grasping signal until front motor is added
     # If there is an anything between hand and target that can be hit (depth smaller than depth of both target and image) - move backwards
@@ -146,19 +148,21 @@ def get_intensity(handBB, targetBB, max_intensity, depth_img):
     cv2.imshow("ROI", im0) # original image only
     """
 
+    baseline_depth_intensity = max(vibration_intensities.values())
+
     #if max_depth > handBB[7]:
     if max_depth < handBB[7]:
         print("object in line of movement")
-        depth_intensity = round(-max_intensity/5) * 5
+        depth_intensity = round(-baseline_depth_intensity/5) * 5
 
     # Otherwise check if hand is closer or further than the target and set depth intensity accordingly
     else:
         depth_distance = handBB[7] - targetBB[7]
         if isinstance(depth_distance, (int, float, np.integer, np.floating)) and not(np.isnan(depth_distance)):
             if depth_distance > 0: #move forward
-                depth_intensity = min(int(10000/depth_distance), max_intensity) # d<=10 -> 100, d=1000 -> 10
+                depth_intensity = min(int(10000/depth_distance), baseline_depth_intensity) # d<=10 -> 100, d=1000 -> 10
             elif depth_distance < 0: #move backwards
-                depth_intensity = max(int(10000/depth_distance), -max_intensity) # d<=10 -> -100, d=1000 -> -10
+                depth_intensity = max(int(10000/depth_distance), -baseline_depth_intensity) # d<=10 -> -100, d=1000 -> -10
             depth_intensity = round(depth_intensity/5) * 5 # steps in 5, so users can feel the change (can be replaced by a calibration value later for personalization)
         else:
             depth_intensity = 0 # placeholder
@@ -218,7 +222,11 @@ def check_overlap(handBB, targetBB, frozen_x, frozen_y, freezed_width, freezed_h
 
 
 # GLOBALS
-max_intensity = calibrate_intensity()
+#max_intensity = calibrate_intensity()
+vibration_intensities = {'bottom': 50,
+                        'top': 50,
+                        'left': 50,
+                        'right': 50}
 searching = False
 prev_hand = None
 prev_target = None
@@ -234,7 +242,11 @@ def navigate_hand(
         bboxes,
         target_cls: str, 
         hand_clss: list,
-        depth_img):
+        depth_img,
+        vibration_intensities = {'bottom': 50,
+                                'top': 50,
+                                'left': 50,
+                                'right': 50}):
     """ Function that navigates the hand to the target object. Handles cases when either hand or target is not detected.
 
     Args:
@@ -255,7 +267,7 @@ def navigate_hand(
     - grasped
     """
 
-    global max_intensity
+    #global max_intensity
     global searching
     global prev_hand
     global prev_target
@@ -281,7 +293,7 @@ def navigate_hand(
  
     if hand is not None and target is not None:
         # Get varying vibration intensities depending on angle from hand to target
-        right_int, left_int, top_int, bot_int, depth_int = get_intensity(hand, target, max_intensity, depth_img)
+        right_int, left_int, top_int, bot_int, depth_int = get_intensity(hand, target, vibration_intensities, depth_img)
         print(f'Vibration intensitites. Right: {right_int}, Left: {left_int}, Top: {top_int}, Bottom: {bot_int}.')
         # Check whether the hand is overlapping the target and freeze targetBB size if necessary (to avoid BB shrinking on occlusion)
         overlapping, frozen_x, frozen_y, freezed_tbbw, freezed_tbbh, freezed = check_overlap(hand, target, frozen_x, frozen_y, freezed_tbbw, freezed_tbbh, freezed)
@@ -391,7 +403,7 @@ def navigate_hand(
                         channel_index=0,
                         orientation_type=BeltOrientationType.ANGLE,
                         orientation=60, # bottom motor
-                        intensity=max_intensity//6,
+                        intensity=max(vibration_intensities.values())//6,
                         on_duration_ms=150,
                         pulse_period=500,
                         pulse_iterations=5,

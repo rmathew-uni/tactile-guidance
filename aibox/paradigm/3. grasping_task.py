@@ -37,6 +37,7 @@ import time
 
 # Output data
 import pandas as pd
+import json
 
 # Image processing
 import cv2
@@ -287,7 +288,7 @@ class GraspingTaskController(controller.BraceletController):
 
 
             # Navigate the hand based on information from last frame and current frame detections
-            grasped, curr_target = navigate_hand(self.belt_controller, outputs, self.class_target_obj, self.class_hand_nav, depth_img)
+            grasped, curr_target = navigate_hand(self.belt_controller, outputs, self.class_target_obj, self.class_hand_nav, depth_img, self.participant_vibration_intensities)
 
         # region visualization
             # Write results
@@ -321,8 +322,11 @@ class GraspingTaskController(controller.BraceletController):
                 trial_info = self.experiment_trial_logic(trial_start_time, trial_end_time, pressed_key)
                 
                 if trial_info == "break":
-                    bracelet_controller.print_output_data()
-                    bracelet_controller.save_output_data()
+                    try:
+                        bracelet_controller.print_output_data()
+                        bracelet_controller.save_output_data()
+                    except ValueError:
+                        pass
                     break
 
             # Save results
@@ -371,6 +375,22 @@ if __name__ == '__main__':
 
     participant = 1
     output_path = str(parent_dir) + '/results/'
+
+    try:
+        with open(output_path + f"calibration_participant_{participant}.json") as file:
+            participant_vibration_intensities = json.load(file)
+        print('Calibration intensities loaded succesfully.')
+    except:
+        while True:
+            continue_with_baseline = input('Error while loading the calibration file. Do you want to continue with baseline intensity of 50 for each vibromotor? (y/n)')
+            if continue_with_baseline == 'y':
+                participant_vibration_intensities = {'bottom': 50,
+                                                     'top': 50,
+                                                     'left': 50,
+                                                     'right': 50,}
+                break
+            elif continue_with_baseline == 'n':
+                sys.exit()
 
     #
 
@@ -435,7 +455,8 @@ if __name__ == '__main__':
                         target_objs=target_objs,
                         output_data=[],
                         output_path=output_path,
-                        participant=participant) # debugging
+                        participant=participant,
+                        participant_vibration_intensities=participant_vibration_intensities) # debugging
         
         bracelet_controller.run()
 
