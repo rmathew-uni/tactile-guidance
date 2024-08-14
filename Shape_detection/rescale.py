@@ -16,34 +16,21 @@ def load_and_preprocess_image(image_path):
     # Convert the image to a numpy array
     image_array = np.array(image)
 
-    # Normalize the pixel values to the range [0, 1]
-    image_array = image_array / 255.0
-
     # If necessary, reshape the array to match the format of EMNIST images
     # Assuming that you want the array to have a shape of (28, 28, 1)
     image_array = image_array.reshape(28, 28, 1)
 
     return image_array
 
+
 def int_labels_to_emnist_format(int_labels):
     """Reshapes a list of integer labels to match the format of EMNIST labels."""
     
     # Reshape the integer labels to match the format of EMNIST labels
-    emnist_format_labels = np.reshape(int_labels, (-1, 1))
+    emnist_format_labels = np.array(int_labels)
 
     return emnist_format_labels
 
-
-def to_emnist_format(char_labels):
-    """Converts a list of character labels to a 2D NumPy array with the same format as EMNIST labels."""
-    
-    # Convert each character label to its corresponding numerical value
-    numeric_labels = [ord(l) - ord('A') for l in char_labels]
-
-    # Reshape the numeric labels to match the format of EMNIST labels
-    emnist_format_labels = np.reshape(numeric_labels, (-1, 1))
-
-    return emnist_format_labels
 
 if __name__ == '__main__':
     # Example usage
