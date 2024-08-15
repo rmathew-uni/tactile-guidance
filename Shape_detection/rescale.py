@@ -31,6 +31,11 @@ def int_labels_to_emnist_format(int_labels):
 
     return emnist_format_labels
 
+def index_to_letter(index):
+    """Convert an index to its corresponding letter (a-z)."""
+    
+    return chr(index + ord('a'))
+
 
 if __name__ == '__main__':
     # Example usage

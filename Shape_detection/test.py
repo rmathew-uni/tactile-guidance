@@ -3,7 +3,12 @@ from emnist import extract_test_samples
 import numpy as np
 import idx2numpy
 import matplotlib.pyplot as plt
-from rescale import (load_and_preprocess_image, int_labels_to_emnist_format)
+from rescale import (load_and_preprocess_image, int_labels_to_emnist_format, index_to_letter)
+import torch.nn.functional as F
+
+def softmax(x):
+    exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))  # Subtract max for numerical stability
+    return exp_x / np.sum(exp_x, axis=1, keepdims=True)
 
 def test(cnn):
     '''Calculates the accuracy of the CNN on the test data'''
@@ -17,15 +22,31 @@ def test(cnn):
                 plt.imshow((images[i].numpy().transpose([1, 2, 0])+1)/2)
                 plt.xticks([])
                 plt.yticks([])
-            plt.show()       
+            #plt.show()       
             test_output = cnn.forward(images)
             pred_y = torch.max(test_output, 1)[1]
+            #print(test_output.shape)
+
+            #pred_letters = [index_to_letter(idx) for idx in pred_y]
+            #label_letters = [index_to_letter(idx) for idx in labels]
+            
+            #print(f"Prediction: {pred_letters}, label: {label_letters}")
             print(f"Prediction: {pred_y}, label: {labels}")
             correct += (pred_y == labels).sum()
+
+            probabilities = F.softmax(test_output, dim=1)
+            #print(probabilities)
+            #print(probabilities.shape)
+
+            for number, i in enumerate(pred_y):
+                predicted_value = i.item()
+                print(predicted_value, 'probability:', probabilities[number][predicted_value]*100,'%')   
+                           
     #accuracy = correct / 400 # Our test data has 40,000 images
     accuracy = 100 * (correct/len(pred_y))
     print('Test Data Accuracy: {0:.2f}'.format(accuracy))
     return accuracy
+
 
 def load_images(path, targets):
 
@@ -40,12 +61,26 @@ def load_images(path, targets):
 
 if __name__ == '__main__':
     # Load EMNIST training dataset
-    #test_images, test_labels = extract_test_samples('digits')
+    test_images, test_labels = extract_test_samples('digits')
+    #print(test_images.shape)
+    #index = 10
+    # Get the image and the correspondin label
+    #image = test_images[index]
+    #label = test_labels[index]
+
+    # Visualize the image
+    #plt.imshow(image, cmap='gray')
+    #plt.title(f'Label: {label}')
+    #plt.axis('off')  # Hide the axis
+    #plt.show()
 
     #image_path = 'D:/WWU/M8 - Master Thesis/Project/Code/Images/four.jpg' 
     image_path = 'D:/WWU/M8 - Master Thesis/Project/Code/Images/'
     targets = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
     test_labels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    #targets = list('abcde')
+    #test_labels = list(range(5))
     test_images, test_labels = load_images(image_path, targets), int_labels_to_emnist_format(test_labels)
 
     #test_images = torch.tensor((test_images/255-0.5).reshape(40000, 1, 28, 28))
