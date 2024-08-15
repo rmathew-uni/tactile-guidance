@@ -29,7 +29,13 @@ def interactive_belt_connect(belt_controller):
     :param BeltController belt_controller: The belt controller to connect.
     """
 
-    interface = 'u'
+    # Ask for the interface
+    interface = input("Connect via Bluetooth or USB? [b,u]")
+    interface = ""
+    print("Connect via Bluetooth or USB? [b,u]", end="")
+    while interface == "":
+        interface = input()
+
     if interface.lower() == "b":
         # Scan for advertising belt
         with pybelt.belt_scanner.create() as scanner:
@@ -282,6 +288,13 @@ def training_task():
     block_accuracies = []
 
     block_results = {}
+    combined_results = {
+        'Trial' : [],
+        'Block' : [],
+        'Actual Direction' : [],
+        'Predicted Direction' : [],
+        'Response Time (s)' : []
+    }
 
     for block in range(blocks):
         correct_responses = 0
@@ -312,6 +325,13 @@ def training_task():
             actual_directions.append(direction)
             predicted_directions.append(user_response)
             response_times.append(response_time)
+
+            # Add to combined results
+            combined_results['Trial'].append(trial_num)
+            combined_results['Block'].append(block + 1)
+            combined_results['Actual Direction'].append(direction)
+            combined_results['Predicted Direction'].append(user_response)
+            combined_results['Response Time (s)'].append(response_time)
 
             if user_response == direction:
                 correct_responses += 1
@@ -360,7 +380,8 @@ def training_task():
 
 
     # Save result to .txt file
-    file_path = r"C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.txt"
+#    file_path = r"C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.txt"
+    file_path = r"D:/WWU/M8 - Master Thesis/Project/Code/training_result.txt"
     with open(file_path, 'w') as file:  
         file.write(f"Selected intensity after training: {calibrated_intensity}\n")
         file.write(f"Block accuracy: {block_accuracies}\n")
@@ -368,10 +389,16 @@ def training_task():
     print('\nResults saved to training_result.txt')
 
     # Excel output
-    with pd.ExcelWriter('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx') as writer:
+#    with pd.ExcelWriter('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx') as writer:
+    with pd.ExcelWriter('D:/WWU/M8 - Master Thesis/Project/Code/training_result.xlsx') as writer:
+        # Write the combined results to the first sheet
+        combined_df = pd.DataFrame(combined_results)
+        combined_df.to_excel(writer, sheet_name='All Blocks', index=False)
+        
+        # Write each block's results to subsequent sheets
         for block_name, data in block_results.items():
             df = pd.DataFrame(data)
-            df.to_excel(writer, sheet_name = block_name, index=False)
+            df.to_excel(writer, sheet_name=block_name, index=False)
     
     #result = {'Actual Direction': actual_directions,
     #     'Predicted Direction': predicted_directions,
