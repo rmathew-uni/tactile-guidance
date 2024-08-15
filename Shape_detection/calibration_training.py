@@ -410,12 +410,37 @@ def training_task():
     #return average_accuracy, block_accuracies, actual_directions, predicted_directions
 
 
+def visualize_confusion_matrix(excel_file_path):
+    # Load the first sheet from the Excel file
+    df = pd.read_excel(excel_file_path, sheet_name='All Blocks')
+
+    # Extract the actual and predicted directions
+    actual_directions = df['Actual Direction']
+    predicted_directions = df['Predicted Direction']
+
+    # Compute the confusion matrix
+    cm = confusion_matrix(actual_directions, predicted_directions)
+
+    # Plot the confusion matrix using Seaborn
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+                xticklabels=df['Actual Direction'].unique(),
+                yticklabels=df['Actual Direction'].unique())
+    plt.xlabel('Predicted Direction')
+    plt.ylabel('Actual Direction')
+    plt.title('Confusion Matrix of Actual vs. Predicted Directions')
+    plt.show()
+
+
 # Run familiarization phase
 #familiarization_phase()
 
 # Run training task
 #training_accuracy = training_task()
 training_task()
+
+# Run confusion matrix
+visualize_confusion_matrix('D:/WWU/M8 - Master Thesis/Project/Code/training_result.xlsx')
 
 belt_controller.disconnect_belt() if belt_controller else None
 sys.exit()
