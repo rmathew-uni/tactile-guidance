@@ -14,7 +14,8 @@ class EMNISTCNN(nn.Module):
             nn.MaxPool2d(kernel_size=2),
         )
         self.fcon1 = nn.Sequential(nn.Linear(49*fmaps2, dense), nn.LeakyReLU())
-        self.fcon2 = nn.Linear(dense, 10)
+        #self.fcon2 = nn.Linear(dense, 10)
+        self.fcon2 = nn.Linear(dense, 26)
         self.dropout = nn.Dropout(p=dropout)
     
     def forward(self, x):
