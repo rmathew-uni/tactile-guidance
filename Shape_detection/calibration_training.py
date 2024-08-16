@@ -16,14 +16,14 @@ from pybelt.belt_scanner import BeltScanner
 from openpyxl.workbook import Workbook
 from bracelet import connect_belt
 
-'''connection_check, belt_controller = connect_belt()
+connection_check, belt_controller = connect_belt()
 if connection_check:
     print('Bracelet connection successful.')
 else:
     print('Error connecting bracelet. Aborting.')
-    sys.exit()'''
+    sys.exit()
 
-belt_controller = None
+#belt_controller = None
 
 # Calibration function to determine optimal vibration intensity
 def calibrate_intensity():
@@ -152,6 +152,14 @@ def vibrate_direction(direction):
             exclusive_channel=False,
             clear_other_channels=False)
 
+# Calibrate the bracelet intensity
+calibrated_intensity = calibrate_intensity()
+print(f'Calibrated intensity: {calibrated_intensity}')
+
+# Directions for training
+directions = ['top', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
+
+
 # Function to capture the keyboard input for direction
 def capture_direction():
     while True:
@@ -206,8 +214,8 @@ def familiarization_phase():
 def training_task():
     print("\nTraining start will start")
     correct_responses_per_block = []
-    blocks = 1
-    trials_per_block = 3
+    blocks = 3
+    trials_per_block = 16
     block_accuracies = []
 
     block_results = {}
@@ -303,8 +311,8 @@ def training_task():
 
 
     # Save result to .txt file
-    file_path = r"C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.txt"
-    #file_path = r"D:/WWU/M8 - Master Thesis/Project/Code/training_result.txt"
+    #file_path = r"C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.txt"
+    file_path = r"D:/WWU/M8 - Master Thesis/Project/Code/training_result.txt"
     with open(file_path, 'w') as file:  
         file.write(f"Selected intensity after training: {calibrated_intensity}\n")
         file.write(f"Block accuracy: {block_accuracies}\n")
@@ -312,8 +320,8 @@ def training_task():
     print('\nResults saved to training_result.txt')
 
     # Excel output
-    with pd.ExcelWriter('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx') as writer:
-    #with pd.ExcelWriter('D:/WWU/M8 - Master Thesis/Project/Code/training_result.xlsx') as writer:
+    #with pd.ExcelWriter('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx') as writer:
+    with pd.ExcelWriter('D:/WWU/M8 - Master Thesis/Project/Code/training_result.xlsx') as writer:
         # Write the combined results to the first sheet
         combined_df = pd.DataFrame(combined_results)
         combined_df.to_excel(writer, sheet_name='All Blocks', index=False)
@@ -332,10 +340,6 @@ def training_task():
     return
     #return average_accuracy, block_accuracies, actual_directions, predicted_directions
 
-import matplotlib.rcsetup as rcsetup
-print(rcsetup.all_backends)
-import matplotlib
-matplotlib.use('template')
 def visualize_confusion_matrix(excel_file_path):
     # Load the first sheet from the Excel file
     df = pd.read_excel(excel_file_path, sheet_name='All Blocks')
@@ -360,21 +364,18 @@ def visualize_confusion_matrix(excel_file_path):
     plt.ylabel('Actual Direction')
     plt.title('Confusion Matrix of Actual vs. Predicted Directions')
     plt.show()
+    plt.savefig('D:/WWU/M8 - Master Thesis/Project/Code/confusion_matrix.jpg')
 
-# Calibrate the bracelet intensity
-#calibrated_intensity = calibrate_intensity()
-#print(f'Calibrated intensity: {calibrated_intensity}')
-
-# Directions for training
-#directions = ['top', 'down', 'right', 'left', 'top right', 'bottom right', 'top left', 'bottom left']
 
 # Run familiarization phase
-#familiarization_phase()
+familiarization_phase()
 
 # Run training task
-#training_task()
+training_task()
 
 # Run confusion matrix
-visualize_confusion_matrix('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx')
-'''belt_controller.disconnect_belt() if belt_controller else None
-sys.exit()'''
+#visualize_confusion_matrix('C:/Users/feelspace/OptiVisT/tactile-guidance/Shape_detection/training_result.xlsx')
+visualize_confusion_matrix('D:/WWU/M8 - Master Thesis/Project/Code/training_result.xlsx')
+
+belt_controller.disconnect_belt() if belt_controller else None
+sys.exit()
