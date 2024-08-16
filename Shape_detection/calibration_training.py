@@ -7,6 +7,7 @@ import keyboard
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import matplotlib.pyplot as plt
+from openpyxl.workbook import Workbook
 from auto_connect import interactive_belt_connect, setup_logger
 from pybelt.belt_controller import (BeltConnectionState, BeltController,
                                     BeltControllerDelegate, BeltMode,
