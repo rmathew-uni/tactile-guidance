@@ -17,78 +17,6 @@ else:
     print('Error connecting bracelet. Aborting.')
     sys.exit()
 
-def interactive_belt_connect(belt_controller):
-    """Interactive procedure to connect a belt. The interface to use is asked via the console.
-
-    :param BeltController belt_controller: The belt controller to connect.
-    """
-
-    # Ask for the interface
-    interface = input("Connect via Bluetooth or USB? [b,u]")
-    interface = ""
-    print("Connect via Bluetooth or USB? [b,u]", end="")
-    while interface == "":
-        interface = input()
-
-    if interface.lower() == "b":
-        # Scan for advertising belt
-        with pybelt.belt_scanner.create() as scanner:
-            print("Start BLE scan.")
-            belts = scanner.scan()
-            print("BLE scan completed.")
-        if len(belts) == 0:
-            print("No belt found.")
-            return belt_controller
-        if len(belts) > 1:
-            print("Select the belt to connect.")
-            for i, belt in enumerate(belts):
-                print("{}. {} - {}".format((i + 1), belt.name, belt.address))
-            belt_selection = input("[1-{}]".format(len(belts)))
-            try:
-                belt_selection_int = int(belt_selection)
-            except ValueError:
-                print("Unrecognized input.")
-                return belt_controller
-            print("Connect the belt.")
-            belt_controller.connect(belts[belt_selection_int - 1])
-        else:
-            print("Connect the belt.")
-            belt_controller.connect(belts[0])
-
-    elif interface.lower() == "u":
-        # List serial COM ports
-        ports = serial.tools.list_ports.comports()
-        if ports is None or len(ports) == 0:
-            print("No serial port found.")
-            return belt_controller
-        if len(ports) == 1:
-            connect_ack = 'y'
-            if connect_ack.lower() == "y" or connect_ack.lower() == "yes":
-                print("Connect the belt.")
-                belt_controller.connect(ports[0][0])
-            else:
-                print("Unrecognized input.")
-                return belt_controller
-        else:
-            print("Select the serial COM port to use.")
-            for i, port in enumerate(ports):
-                print("{}. {}".format((i + 1), port[0]))
-            belt_selection = input("[1-{}]".format(len(ports)))
-            try:
-                belt_selection_int = int(belt_selection)
-            except ValueError:
-                print("Unrecognized input.")
-                return belt_controller
-            print("Connect the belt.")
-            belt_controller.connect(ports[belt_selection_int - 1][0])
-
-    else:
-        print("Unrecognized input.")
-        return belt_controller
-
-    return belt_controller
-
-
 # Define shapes with vertices
 shapes = {
     '0': [(0, 0), (0, 4), (2, 4), (2, 0), (0, 0)],
@@ -126,10 +54,16 @@ shapes = {
 
 # Function to calculate direction and distance
 def calculate_direction_and_time(start, end, speed=1):
+    max_distance = 25  # Maximum comfortable distance for movement
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     distance = np.sqrt(dx**2 + dy**2)
-    time_required = distance / speed 
+
+    # If the distance exceeds max_distance, adjust the time to cap it
+    if distance > max_distance:
+        time_required = max_distance / speed
+    else:
+        time_required = distance / speed
 
     vibration_intensity = 50
     
