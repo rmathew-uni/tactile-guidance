@@ -89,7 +89,7 @@ def train_save(epochs, train_data, valid_data):
     scheduler = torch.optim.lr_scheduler.StepLR(optimiser, step_size=15, gamma=0.5)
 
     train(epochs, cnn, train_loader, valid_loader, optimiser, loss_func, scheduler=scheduler)
-    torch.save(cnn, 'torch_emnistcnn_letter.pt')
+    torch.save(cnn, 'D:/WWU/M8 - Master Thesis/Project/Code/torch_emnistcnn_letter.pt')
 
 if __name__ == '__main__':
     epochs = 60
